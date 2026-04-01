@@ -7,7 +7,7 @@ type MediaItem = {
   title: string;
   media_type: string;
   date_consumed: string;
-  time_consumed: number; // total minutes
+  time_consumed: number;
 };
 
 function formatDuration(totalMinutes: number) {
@@ -20,9 +20,13 @@ function formatDuration(totalMinutes: number) {
 }
 
 export default function Home() {
+  const API_BASE_URL = "http://127.0.0.1:8000";
+
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   const [newItem, setNewItem] = useState({
@@ -41,8 +45,6 @@ export default function Home() {
     timeConsumed: 0,
   });
 
-  const API_BASE_URL = "http://127.0.0.1:8000";
-
   async function fetchMediaItems() {
     try {
       setLoading(true);
@@ -53,10 +55,10 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to fetch media items");
+        throw new Error(`Failed to fetch media items: ${res.status}`);
       }
 
-      const data = await res.json();
+      const data: MediaItem[] = await res.json();
       setMediaItems(data);
     } catch (err) {
       console.error(err);
@@ -84,6 +86,11 @@ export default function Home() {
     const minutes = parseInt(newItem.timeMinutes) || 0;
     const totalMinutes = hours * 60 + minutes;
 
+    if (totalMinutes <= 0) {
+      setError("Time consumed must be at least 1 minute.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError("");
@@ -102,10 +109,10 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to create media item");
+        throw new Error(`Failed to create media item: ${res.status}`);
       }
 
-      const createdItem = await res.json();
+      const createdItem: MediaItem = await res.json();
 
       setMediaItems((prev) => [...prev, createdItem]);
       setNewItem({
@@ -123,8 +130,30 @@ export default function Home() {
     }
   };
 
-  const handleDeleteItem = (id: number) => {
-    setMediaItems((prev) => prev.filter((item) => item.media_id !== id));
+  const handleDeleteItem = async (id: number) => {
+    try {
+      setDeletingId(id);
+      setError("");
+
+      const res = await fetch(`${API_BASE_URL}/media/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete media item: ${res.status}`);
+      }
+
+      setMediaItems((prev) => prev.filter((item) => item.media_id !== id));
+
+      if (editingId === id) {
+        setEditingId(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Could not delete media item.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleStartEdit = (item: MediaItem) => {
@@ -137,22 +166,55 @@ export default function Home() {
     });
   };
 
-  const handleSaveEdit = (id: number) => {
-    setMediaItems((prev) =>
-      prev.map((item) =>
-        item.media_id === id
-          ? {
-              ...item,
-              title: editItem.title,
-              media_type: editItem.mediaType,
-              date_consumed: editItem.dateConsumed,
-              time_consumed: editItem.timeConsumed,
-            }
-          : item
-      )
-    );
+  const handleSaveEdit = async (id: number) => {
+    if (
+      !editItem.title.trim() ||
+      !editItem.mediaType.trim() ||
+      !editItem.dateConsumed
+    ) {
+      setError("Please fill in all edit fields.");
+      return;
+    }
 
-    setEditingId(null);
+    if (editItem.timeConsumed <= 0) {
+      setError("Time consumed must be at least 1 minute.");
+      return;
+    }
+
+    try {
+      setSavingId(id);
+      setError("");
+
+      const res = await fetch(`${API_BASE_URL}/media/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: editItem.title,
+          media_type: editItem.mediaType,
+          date_consumed: editItem.dateConsumed,
+          time_consumed: editItem.timeConsumed,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to update media item: ${res.status}`);
+      }
+
+      const updatedItem: MediaItem = await res.json();
+
+      setMediaItems((prev) =>
+        prev.map((item) => (item.media_id === id ? updatedItem : item))
+      );
+
+      setEditingId(null);
+    } catch (err) {
+      console.error(err);
+      setError("Could not update media item.");
+    } finally {
+      setSavingId(null);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -245,9 +307,7 @@ export default function Home() {
             </div>
           </div>
 
-          {error && (
-            <p className="mt-4 text-sm text-red-300">{error}</p>
-          )}
+          {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
           <button
             onClick={handleAddItem}
@@ -399,9 +459,10 @@ export default function Home() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleSaveEdit(item.media_id)}
-                                className="rounded-lg bg-violet-600 px-3 py-2 text-white transition-all duration-200 hover:bg-violet-500"
+                                disabled={savingId === item.media_id}
+                                className="rounded-lg bg-violet-600 px-3 py-2 text-white transition-all duration-200 hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                Save
+                                {savingId === item.media_id ? "Saving..." : "Save"}
                               </button>
                               <button
                                 onClick={handleCancelEdit}
@@ -424,15 +485,17 @@ export default function Home() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleStartEdit(item)}
-                                className="rounded-lg bg-violet-600 px-3 py-2 text-white transition-all duration-200 hover:bg-violet-500"
+                                disabled={deletingId === item.media_id}
+                                className="rounded-lg bg-violet-600 px-3 py-2 text-white transition-all duration-200 hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteItem(item.media_id)}
-                                className="rounded-lg bg-red-600 px-3 py-2 text-white transition-all duration-200 hover:bg-red-500"
+                                disabled={deletingId === item.media_id}
+                                className="rounded-lg bg-red-600 px-3 py-2 text-white transition-all duration-200 hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                Delete
+                                {deletingId === item.media_id ? "Deleting..." : "Delete"}
                               </button>
                             </div>
                           </td>
