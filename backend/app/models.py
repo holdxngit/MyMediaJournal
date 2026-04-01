@@ -1,11 +1,138 @@
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, PrimaryKeyConstraint
+from sqlalchemy.orm import DeclarativeBase, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "user"
+
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String, nullable=False, unique=True)
+
+    consumption_logs = relationship("ConsumptionLog", back_populates="user")
+    goals = relationship("Goal", back_populates="user")
+    wrapped_reports = relationship("WrappedReport", back_populates="user")
+
+
+class Friendship(Base):
+    __tablename__ = "friendship"
+    __table_args__ = (PrimaryKeyConstraint("friend_id", "user_id"),)
+
+    friend_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    date_friended = Column(Date, nullable=False)
+
+
+class ConsumptionLog(Base):
+    __tablename__ = "consumption_log"
+
+    log_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    calendar = Column(Date, nullable=False)
+
+    user = relationship("User", back_populates="consumption_logs")
+    log_media_items = relationship("LogMediaItem", back_populates="consumption_log")
+
 
 class MediaItem(Base):
     __tablename__ = "media_item"
 
-    media_id = Column(Integer, primary_key=True, index=True)
+    media_id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String, nullable=False)
     media_type = Column(String, nullable=False)
+
+    log_media_items = relationship("LogMediaItem", back_populates="media_item")
+    sources = relationship("MediaItemSource", back_populates="media_item")
+    genres = relationship("MediaItemGenre", back_populates="media_item")
+
+
+class LogMediaItem(Base):
+    __tablename__ = "log_media_item"
+
+    log_media_item_id = Column(Integer, primary_key=True, autoincrement=True)
+    log_id = Column(Integer, ForeignKey("consumption_log.log_id"), nullable=False)
+    media_id = Column(Integer, ForeignKey("media_item.media_id"), nullable=False)
+    date_consumed = Column(Date, nullable=False)
+    time_consumed = Column(Integer, nullable=False)  # total minutes
+
+    consumption_log = relationship("ConsumptionLog", back_populates="log_media_items")
+    media_item = relationship("MediaItem", back_populates="log_media_items")
+
+
+class Source(Base):
+    __tablename__ = "source"
+
+    source_id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+
+    media_items = relationship("MediaItemSource", back_populates="source")
+
+
+class MediaItemSource(Base):
+    __tablename__ = "media_item_source"
+    __table_args__ = (PrimaryKeyConstraint("media_id", "source_id"),)
+
+    media_id = Column(Integer, ForeignKey("media_item.media_id"), nullable=False)
+    source_id = Column(Integer, ForeignKey("source.source_id"), nullable=False)
+
+    media_item = relationship("MediaItem", back_populates="sources")
+    source = relationship("Source", back_populates="media_items")
+
+
+class Genre(Base):
+    __tablename__ = "genre"
+
+    genre_id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+
+    media_items = relationship("MediaItemGenre", back_populates="genre")
+    goals = relationship("Goal", back_populates="genre")
+
+
+class MediaItemGenre(Base):
+    __tablename__ = "media_item_genre"
+    __table_args__ = (PrimaryKeyConstraint("media_id", "genre_id"),)
+
+    media_id = Column(Integer, ForeignKey("media_item.media_id"), nullable=False)
+    genre_id = Column(Integer, ForeignKey("genre.genre_id"), nullable=False)
+
+    media_item = relationship("MediaItem", back_populates="genres")
+    genre = relationship("Genre", back_populates="media_items")
+
+
+class GenreSimilarity(Base):
+    __tablename__ = "genre_similarity"
+    __table_args__ = (PrimaryKeyConstraint("genre_id_1", "genre_id_2"),)
+
+    genre_id_1 = Column(Integer, ForeignKey("genre.genre_id"), nullable=False)
+    genre_id_2 = Column(Integer, ForeignKey("genre.genre_id"), nullable=False)
+
+
+class Goal(Base):
+    __tablename__ = "goal"
+
+    goal_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    genre_id = Column(Integer, ForeignKey("genre.genre_id"), nullable=True)
+    title = Column(String, nullable=False)
+    media_type = Column(String, nullable=True)
+    quantity = Column(Integer, nullable=False)
+    start_date = Column(Date, nullable=False)
+
+    user = relationship("User", back_populates="goals")
+    genre = relationship("Genre", back_populates="goals")
+
+
+class WrappedReport(Base):
+    __tablename__ = "wrapped_report"
+
+    report_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    log_id = Column(Integer, ForeignKey("consumption_log.log_id"), nullable=True)
+    most_used_media = Column(Integer, ForeignKey("media_item.media_id"), nullable=True)
+    goal = Column(Integer, ForeignKey("goal.goal_id"), nullable=True)
+
+    user = relationship("User", back_populates="wrapped_reports")
