@@ -1,0 +1,44 @@
+BACKEND_DIR = backend
+VENV = $(BACKEND_DIR)/venv
+PYTHON = $(VENV)/bin/python
+PIP = $(VENV)/bin/pip
+ALEMBIC = $(VENV)/bin/alembic
+FRONTEND_DIR = frontend
+
+.PHONY: help setup up down migrate migration dev-backend dev-frontend install-backend
+
+help:
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "  setup           First-time setup: start DB, install deps, run migrations"
+	@echo "  up              Start Docker services"
+	@echo "  down            Stop Docker services"
+	@echo "  install-backend Install Python dependencies into venv"
+	@echo "  migrate         Apply all pending migrations"
+	@echo "  migration       Create a new migration (usage: make migration name=my_migration)"
+	@echo "  dev-backend     Run the FastAPI dev server"
+	@echo "  dev-frontend    Run the Next.js dev server"
+
+setup: up install-backend migrate
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+install-backend:
+	cd $(BACKEND_DIR) && python3 -m venv venv && $(PIP) install -r requirements.txt
+
+migrate:
+	cd $(BACKEND_DIR) && $(ALEMBIC) upgrade head
+
+migration:
+	@if [ -z "$(name)" ]; then echo "Usage: make migration name=<migration_name>"; exit 1; fi
+	cd $(BACKEND_DIR) && $(ALEMBIC) revision --autogenerate -m "$(name)"
+
+dev-backend:
+	cd $(BACKEND_DIR) && $(VENV)/bin/uvicorn app.main:app --reload
+
+dev-frontend:
+	cd $(FRONTEND_DIR) && npm run dev
