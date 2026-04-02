@@ -28,17 +28,17 @@ down:
 	docker compose down
 
 install-backend:
-	cd $(BACKEND_DIR) && python3 -m venv venv && $(PIP) install -r requirements.txt
+	python3 -m venv $(VENV) && $(PIP) install -r $(BACKEND_DIR)/requirements.txt
 
 migrate:
-	cd $(BACKEND_DIR) && $(ALEMBIC) upgrade head
+	cd $(BACKEND_DIR) && venv/bin/alembic upgrade head
 
 migration:
 	@if [ -z "$(name)" ]; then echo "Usage: make migration name=<migration_name>"; exit 1; fi
-	cd $(BACKEND_DIR) && $(ALEMBIC) revision --autogenerate -m "$(name)"
+	cd $(BACKEND_DIR) && venv/bin/alembic revision --autogenerate -m "$(name)"
 
 dev-backend:
-	cd $(BACKEND_DIR) && $(VENV)/bin/uvicorn app.main:app --reload
+	cd $(BACKEND_DIR) && venv/bin/uvicorn app.main:app --reload
 
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm run dev
