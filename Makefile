@@ -18,6 +18,7 @@ help:
 	@echo "  migration       Create a new migration (usage: make migration name=my_migration)"
 	@echo "  dev-backend     Run the FastAPI dev server"
 	@echo "  dev-frontend    Run the Next.js dev server"
+	@echo "  seed            Populate the database with sample data (local only)"
 
 setup: up install-backend migrate
 
@@ -42,3 +43,6 @@ dev-backend:
 
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm run dev
+
+seed:
+	cd scripts/seed && go mod tidy && go run .
