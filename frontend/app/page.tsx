@@ -36,45 +36,31 @@ const inputClass =
 const MEDIA_TYPES = ["Movie", "Show", "Anime", "Game", "Book", "Manga", "Other"];
 
 export default function Home() {
-  const [catalog, setCatalog] = useState<MediaItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
-  const [mediaTypeFilter, setMediaTypeFilter] = useState("");
-  const [genreFilter, setGenreFilter] = useState("");
-  const [loggingItem, setLoggingItem] = useState<MediaItem | null>(null);
-  const [logForm, setLogForm] = useState({
-    dateConsumed: "",
-    timeHours: "",
-    timeMinutes: "",
-  });
-  const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [editLog, setEditLog] = useState({ dateConsumed: "", timeConsumed: 0 });
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchCatalog = useCallback(async () => {
-    try {
-      const params = new URLSearchParams();
-      if (mediaTypeFilter) params.set("media_type", mediaTypeFilter);
-      if (genreFilter) params.set("genre", genreFilter);
-      const qs = params.toString();
-      const res = await fetch(`${API_BASE_URL}/media${qs ? `?${qs}` : ""}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error();
-      setCatalog(await res.json());
-    } catch {
-      setError("Could not load media catalog.");
-    }
-  }, [mediaTypeFilter, genreFilter]);
+  // Journal edit state
+  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+  const [editLog, setEditLog] = useState({ dateConsumed: "", timeConsumed: 0 });
+
+  // New Item modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalCatalog, setModalCatalog] = useState<MediaItem[]>([]);
+  const [modalSearch, setModalSearch] = useState("");
+  const [modalMediaType, setModalMediaType] = useState("");
+  const [modalGenre, setModalGenre] = useState("");
+  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [logForm, setLogForm] = useState({ dateConsumed: "", timeHours: "", timeMinutes: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState("");
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/logs?user_id=${DEMO_USER_ID}`,
-        { cache: "no-store" }
-      );
+      const res = await fetch(`${API_BASE_URL}/logs?user_id=${DEMO_USER_ID}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error();
       setLogs(await res.json());
     } catch {
@@ -82,46 +68,88 @@ export default function Home() {
     }
   }, []);
 
+  const fetchModalCatalog = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (modalMediaType) params.set("media_type", modalMediaType);
+      if (modalGenre) params.set("genre", modalGenre);
+      const qs = params.toString();
+      const res = await fetch(`${API_BASE_URL}/media${qs ? `?${qs}` : ""}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error();
+      setModalCatalog(await res.json());
+    } catch {
+      setModalError("Could not load media catalog.");
+    }
+  }, [modalMediaType, modalGenre]);
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/genres`);
-        if (res.ok) setGenres(await res.json());
-        await Promise.all([fetchCatalog(), fetchLogs()]);
+        const [genresRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/genres`),
+          fetchLogs(),
+        ]);
+        if (genresRes.ok) setGenres(await genresRes.json());
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, [fetchCatalog, fetchLogs]);
+  }, [fetchLogs]);
 
   useEffect(() => {
-    fetchCatalog();
-  }, [fetchCatalog]);
+    if (showModal) fetchModalCatalog();
+  }, [showModal, fetchModalCatalog]);
+
+  const openModal = () => {
+    setShowModal(true);
+    setSelectedItem(null);
+    setModalSearch("");
+    setModalMediaType("");
+    setModalGenre("");
+    setLogForm({ dateConsumed: "", timeHours: "", timeMinutes: "" });
+    setModalError("");
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedItem(null);
+    setModalError("");
+  };
+
+  const filteredCatalog = modalCatalog.filter((item) =>
+    item.title.toLowerCase().includes(modalSearch.toLowerCase())
+  );
 
   const handleLogSubmit = async () => {
-    if (!loggingItem || !logForm.dateConsumed) {
-      setError("Please fill in the date.");
+    if (!selectedItem) {
+      setModalError("Select an item from the list.");
+      return;
+    }
+    if (!logForm.dateConsumed) {
+      setModalError("Please fill in the date.");
       return;
     }
     const hours = parseInt(logForm.timeHours) || 0;
     const minutes = parseInt(logForm.timeMinutes) || 0;
     const totalMinutes = hours * 60 + minutes;
     if (totalMinutes <= 0) {
-      setError("Time consumed must be at least 1 minute.");
+      setModalError("Time consumed must be at least 1 minute.");
       return;
     }
 
     try {
       setSubmitting(true);
-      setError("");
+      setModalError("");
       const res = await fetch(`${API_BASE_URL}/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: DEMO_USER_ID,
-          media_id: loggingItem.media_id,
+          media_id: selectedItem.media_id,
           date_consumed: logForm.dateConsumed,
           time_consumed: totalMinutes,
         }),
@@ -129,10 +157,9 @@ export default function Home() {
       if (!res.ok) throw new Error();
       const created: LogEntry = await res.json();
       setLogs((prev) => [created, ...prev]);
-      setLoggingItem(null);
-      setLogForm({ dateConsumed: "", timeHours: "", timeMinutes: "" });
+      closeModal();
     } catch {
-      setError("Could not log media item.");
+      setModalError("Could not save log entry.");
     } finally {
       setSubmitting(false);
     }
@@ -191,181 +218,33 @@ export default function Home() {
           <h1 className="bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-4xl font-semibold tracking-tight text-transparent">
             Media Journal
           </h1>
-          <p className="mt-2 text-gray-400">Browse the catalog and log what you've watched, played, or read.</p>
+          <p className="mt-2 text-gray-400">Track what you&apos;ve watched, played, or read.</p>
         </div>
 
-        {error && !loggingItem && (
+        {error && (
           <p className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {error}
           </p>
         )}
 
-        {/* Catalog */}
-        <section className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_40px_rgba(139,92,246,0.1)] backdrop-blur-xl">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold">Media Catalog</h2>
-            <div className="flex flex-wrap gap-3">
-              <select
-                value={mediaTypeFilter}
-                onChange={(e) => { setMediaTypeFilter(e.target.value); setError(""); }}
-                className={inputClass}
-              >
-                <option value="">All Types</option>
-                {MEDIA_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <select
-                value={genreFilter}
-                onChange={(e) => { setGenreFilter(e.target.value); setError(""); }}
-                className={inputClass}
-              >
-                <option value="">All Genres</option>
-                {genres.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-              {(mediaTypeFilter || genreFilter) && (
-                <button
-                  onClick={() => { setMediaTypeFilter(""); setGenreFilter(""); }}
-                  className="rounded-xl border border-white/10 px-4 py-3 text-sm text-gray-400 transition hover:border-white/30 hover:text-white"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full overflow-hidden rounded-xl">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5 text-left text-sm uppercase tracking-wide text-gray-400">
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Genres</th>
-                  <th className="px-4 py-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {catalog.map((item) => (
-                  <tr
-                    key={item.media_id}
-                    className="border-b border-white/5 text-sm text-gray-200 transition hover:bg-white/5"
-                  >
-                    <td className="px-4 py-4 font-medium">{item.title}</td>
-                    <td className="px-4 py-4">{item.media_type}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {item.genres.map((g) => (
-                          <span
-                            key={g}
-                            className="rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-300"
-                          >
-                            {g}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <button
-                        onClick={() => {
-                          setLoggingItem(item);
-                          setLogForm({ dateConsumed: "", timeHours: "", timeMinutes: "" });
-                          setError("");
-                        }}
-                        className="rounded-lg bg-violet-600 px-3 py-2 text-sm text-white transition hover:bg-violet-500"
-                      >
-                        Log It
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {catalog.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
-                      No items match the current filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Log Modal */}
-        {loggingItem && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-            onClick={(e) => { if (e.target === e.currentTarget) { setLoggingItem(null); setError(""); } }}
-          >
-            <div className="w-full max-w-md rounded-2xl border border-violet-500/30 bg-[#0f0f1a] p-6 shadow-[0_0_60px_rgba(139,92,246,0.2)]">
-              <h2 className="mb-1 text-xl font-semibold">Log Entry</h2>
-              <p className="mb-5 text-sm text-gray-400">
-                Logging: <span className="text-violet-300">{loggingItem.title}</span>
-              </p>
-
-              {error && (
-                <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  {error}
-                </p>
-              )}
-
-              <div className="flex flex-col gap-3">
-                <input
-                  type="date"
-                  value={logForm.dateConsumed}
-                  onChange={(e) => setLogForm((p) => ({ ...p, dateConsumed: e.target.value }))}
-                  className={`w-full ${inputClass}`}
-                />
-                <div className="flex gap-3">
-                  <input
-                    type="number"
-                    placeholder="Hours"
-                    min="0"
-                    value={logForm.timeHours}
-                    onChange={(e) => setLogForm((p) => ({ ...p, timeHours: e.target.value }))}
-                    className={`w-1/2 ${inputClass}`}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Minutes"
-                    min="0"
-                    value={logForm.timeMinutes}
-                    onChange={(e) => setLogForm((p) => ({ ...p, timeMinutes: e.target.value }))}
-                    className={`w-1/2 ${inputClass}`}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-3">
-                <button
-                  onClick={handleLogSubmit}
-                  disabled={submitting}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 font-medium text-white transition hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {submitting ? "Saving..." : "Save Entry"}
-                </button>
-                <button
-                  onClick={() => { setLoggingItem(null); setError(""); }}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-gray-400 transition hover:border-white/30 hover:text-white"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Journal */}
+        {/* My Journal */}
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_40px_rgba(139,92,246,0.1)] backdrop-blur-xl">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">My Journal</h2>
-            <button
-              onClick={fetchLogs}
-              className="rounded-lg bg-[#1a1a2e] px-4 py-2 text-sm text-violet-200 transition hover:bg-[#23233a]"
-            >
-              Refresh
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={fetchLogs}
+                className="rounded-lg bg-[#1a1a2e] px-4 py-2 text-sm text-violet-200 transition hover:bg-[#23233a]"
+              >
+                Refresh
+              </button>
+              <button
+                onClick={openModal}
+                className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/30"
+              >
+                + New Item
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -477,7 +356,7 @@ export default function Home() {
                 {logs.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                      No journal entries yet. Log something from the catalog above.
+                      No journal entries yet. Click &quot;+ New Item&quot; to log something.
                     </td>
                   </tr>
                 )}
@@ -486,6 +365,140 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {/* New Item Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-violet-500/30 bg-[#0f0f1a] shadow-[0_0_60px_rgba(139,92,246,0.2)]"
+            style={{ maxHeight: "90vh" }}
+          >
+            {/* Modal Header */}
+            <div className="border-b border-white/10 px-6 py-5">
+              <h2 className="text-xl font-semibold">Add New Entry</h2>
+              <p className="mt-1 text-sm text-gray-400">Search the catalog and pick something to log.</p>
+            </div>
+
+            {/* Search & Filters */}
+            <div className="flex flex-wrap gap-3 border-b border-white/10 px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search by title..."
+                value={modalSearch}
+                onChange={(e) => setModalSearch(e.target.value)}
+                className={`flex-1 min-w-[160px] ${inputClass}`}
+              />
+              <select
+                value={modalMediaType}
+                onChange={(e) => { setModalMediaType(e.target.value); setSelectedItem(null); }}
+                className={inputClass}
+              >
+                <option value="">All Types</option>
+                {MEDIA_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <select
+                value={modalGenre}
+                onChange={(e) => { setModalGenre(e.target.value); setSelectedItem(null); }}
+                className={inputClass}
+              >
+                <option value="">All Genres</option>
+                {genres.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Catalog List */}
+            <div className="overflow-y-auto px-6 py-2" style={{ maxHeight: "300px" }}>
+              {filteredCatalog.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-400">No items match.</p>
+              ) : (
+                filteredCatalog.map((item) => (
+                  <button
+                    key={item.media_id}
+                    onClick={() => setSelectedItem(item)}
+                    className={`w-full rounded-xl px-4 py-3 text-left text-sm transition ${
+                      selectedItem?.media_id === item.media_id
+                        ? "bg-violet-600/30 border border-violet-500/50 text-white"
+                        : "border border-transparent text-gray-300 hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <span className="ml-2 text-gray-400">{item.media_type}</span>
+                    {item.genres.length > 0 && (
+                      <span className="ml-2 text-violet-400 text-xs">
+                        {item.genres.join(", ")}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Log Form */}
+            <div className="border-t border-white/10 px-6 py-4">
+              {selectedItem && (
+                <p className="mb-3 text-sm text-gray-400">
+                  Selected:{" "}
+                  <span className="font-medium text-violet-300">{selectedItem.title}</span>
+                </p>
+              )}
+
+              {modalError && (
+                <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  {modalError}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="date"
+                  value={logForm.dateConsumed}
+                  onChange={(e) => setLogForm((p) => ({ ...p, dateConsumed: e.target.value }))}
+                  className={`flex-1 min-w-[160px] ${inputClass}`}
+                />
+                <input
+                  type="number"
+                  placeholder="Hours"
+                  min="0"
+                  value={logForm.timeHours}
+                  onChange={(e) => setLogForm((p) => ({ ...p, timeHours: e.target.value }))}
+                  className={`w-28 ${inputClass}`}
+                />
+                <input
+                  type="number"
+                  placeholder="Minutes"
+                  min="0"
+                  value={logForm.timeMinutes}
+                  onChange={(e) => setLogForm((p) => ({ ...p, timeMinutes: e.target.value }))}
+                  className={`w-28 ${inputClass}`}
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 border-t border-white/10 px-6 py-4">
+              <button
+                onClick={handleLogSubmit}
+                disabled={submitting}
+                className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 font-medium text-white transition hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Saving..." : "Save Entry"}
+              </button>
+              <button
+                onClick={closeModal}
+                className="rounded-xl border border-white/10 px-5 py-3 text-gray-400 transition hover:border-white/30 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
