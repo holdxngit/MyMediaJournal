@@ -5,7 +5,7 @@ PIP = $(VENV)/bin/pip
 ALEMBIC = $(VENV)/bin/alembic
 FRONTEND_DIR = frontend
 
-.PHONY: help setup up down migrate migration dev-backend dev-frontend install-backend
+.PHONY: help setup up down migrate migration dev-backend dev-frontend install-backend seed seed-py
 
 help:
 	@echo "Usage: make <target>"
@@ -18,7 +18,8 @@ help:
 	@echo "  migration       Create a new migration (usage: make migration name=my_migration)"
 	@echo "  dev-backend     Run the FastAPI dev server"
 	@echo "  dev-frontend    Run the Next.js dev server"
-	@echo "  seed            Populate the database with sample data (local only)"
+	@echo "  seed            Populate the database with sample data (requires Go)
+  seed-py         Populate the database with sample data (Python fallback, no Go needed)"
 
 setup: up install-backend migrate
 
@@ -46,3 +47,6 @@ dev-frontend:
 
 seed:
 	cd scripts/seed && go mod tidy && go run .
+
+seed-py:
+	$(PYTHON) scripts/seed/seed.py
