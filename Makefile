@@ -18,8 +18,8 @@ help:
 	@echo "  migration       Create a new migration (usage: make migration name=my_migration)"
 	@echo "  dev-backend     Run the FastAPI dev server"
 	@echo "  dev-frontend    Run the Next.js dev server"
-	@echo "  seed            Populate the database with sample data (requires Go)
-  seed-py         Populate the database with sample data (Python fallback, no Go needed)"
+	@echo "  seed            Populate the database with sample data (requires Go)"
+	@echo "  seed-py         Populate the database with sample data (Python fallback, no Go needed)"
 
 setup: up install-backend migrate
 
