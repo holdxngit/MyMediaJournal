@@ -46,6 +46,9 @@ export default function Home() {
   const apiBaseUrl = getApiBaseUrl();
   const [user, setUser] = useState<User | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logPage, setLogPage] = useState(1);
+  const [logTotal, setLogTotal] = useState(0);
+  const [logPageSize, setLogPageSize] = useState(20);
   const [genres, setGenres] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,9 +68,9 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (page = 1) => {
     try {
-      const res = await fetch(`${apiBaseUrl}/logs`, {
+      const res = await fetch(`${apiBaseUrl}/logs?page=${page}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -76,7 +79,11 @@ export default function Home() {
         return;
       }
       if (!res.ok) throw new Error();
-      setLogs(await res.json());
+      const data = await res.json();
+      setLogs(data.items);
+      setLogTotal(data.total);
+      setLogPageSize(data.page_size);
+      setLogPage(page);
     } catch {
       setError("Could not load journal entries.");
     }
@@ -182,8 +189,7 @@ export default function Home() {
         }),
       });
       if (!res.ok) throw new Error();
-      const created: LogEntry = await res.json();
-      setLogs((prev) => [created, ...prev]);
+      await fetchLogs(1);
       closeModal();
     } catch {
       setModalError("Could not save log entry.");
@@ -209,8 +215,7 @@ export default function Home() {
         }),
       });
       if (!res.ok) throw new Error();
-      const updated: LogEntry = await res.json();
-      setLogs((prev) => prev.map((l) => (l.log_id === id ? updated : l)));
+      await fetchLogs(logPage);
       setEditingLogId(null);
     } catch {
       setError("Could not update log entry.");
@@ -225,8 +230,10 @@ export default function Home() {
         credentials: "include",
       });
       if (!res.ok) throw new Error();
-      setLogs((prev) => prev.filter((l) => l.log_id !== id));
       if (editingLogId === id) setEditingLogId(null);
+      // If we deleted the last item on a non-first page, go back one page
+      const targetPage = logs.length === 1 && logPage > 1 ? logPage - 1 : logPage;
+      await fetchLogs(targetPage);
     } catch {
       setError("Could not delete log entry.");
     }
@@ -284,7 +291,7 @@ export default function Home() {
         )}
 
         {/* My Journal */}
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_40px_rgba(139,92,246,0.1)] backdrop-blur-xl">
+        <section>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">My Journal</h2>
             <div className="flex gap-3">
@@ -304,7 +311,7 @@ export default function Home() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full overflow-hidden rounded-xl">
+            <table className="min-w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5 text-left text-sm uppercase tracking-wide text-gray-400">
                   <th className="px-4 py-3">Title</th>
@@ -318,7 +325,7 @@ export default function Home() {
                 {logs.map((log) => (
                   <tr
                     key={log.log_id}
-                    className="border-b border-white/5 text-sm text-gray-200 transition hover:bg-white/5"
+                    className="border-b border-white/5 text-sm text-gray-200 transition even:bg-white/[0.03] hover:bg-white/[0.07]"
                   >
                     {editingLogId === log.log_id ? (
                       <>
@@ -419,6 +426,31 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {logTotal > logPageSize && <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
+            <span>
+              {logTotal === 0
+                ? "0 entries"
+                : `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} of ${logTotal} entries`}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => fetchLogs(logPage - 1)}
+                disabled={logPage === 1}
+                className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Prev
+              </button>
+              <button
+                onClick={() => fetchLogs(logPage + 1)}
+                disabled={logPage * logPageSize >= logTotal}
+                className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          </div>}
         </section>
       </div>
 
