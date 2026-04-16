@@ -24,3 +24,65 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
+/* Number input — dim the spin arrows to match the dark theme */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.3;
+  filter: invert(1);
+}
+
+/* Date input — dim the calendar picker icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.4;
+  filter: invert(1);
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.8;
+}
+
+/* react-day-picker dark theme overrides */
+.rdp-root {
+  --rdp-accent-color: #7c3aed;
+  --rdp-accent-background-color: rgba(124, 58, 237, 0.2);
+  --rdp-day-width: 36px;
+  --rdp-day-height: 36px;
+  --rdp-day_button-width: 36px;
+  --rdp-day_button-height: 36px;
+  --rdp-day_button-border-radius: 8px;
+  color: #e2e8f0;
+}
+.rdp-root .rdp-day_button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.rdp-root .rdp-chevron {
+  fill: #a78bfa;
+}
+.rdp-root .rdp-month_caption,
+.rdp-root .rdp-weekday {
+  color: #a78bfa;
+}
+.rdp-root .rdp-outside {
+  color: #4b5563;
+}
+.rdp-root .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border: 1px solid rgba(124, 58, 237, 0.5);
+  color: #a78bfa;
+}

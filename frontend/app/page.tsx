@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 
 import { getApiBaseUrl } from "./api";
+import { DatePicker } from "./DatePicker";
 
 type MediaItem = {
   media_id: number;
@@ -231,7 +232,6 @@ export default function Home() {
       });
       if (!res.ok) throw new Error();
       if (editingLogId === id) setEditingLogId(null);
-      // If we deleted the last item on a non-first page, go back one page
       const targetPage = logs.length === 1 && logPage > 1 ? logPage - 1 : logPage;
       await fetchLogs(targetPage);
     } catch {
@@ -332,11 +332,9 @@ export default function Home() {
                         <td className="px-4 py-4 font-medium text-gray-400">{log.title}</td>
                         <td className="px-4 py-4 text-gray-400">{log.media_type}</td>
                         <td className="px-4 py-4">
-                          <input
-                            type="date"
+                          <DatePicker
                             value={editLog.dateConsumed}
-                            onChange={(e) => setEditLog((p) => ({ ...p, dateConsumed: e.target.value }))}
-                            className="rounded-lg border border-white/10 bg-[#1a1a2e] px-3 py-2 text-white outline-none focus:border-violet-500"
+                            onChange={(v) => setEditLog((p) => ({ ...p, dateConsumed: v }))}
                           />
                         </td>
                         <td className="px-4 py-4">
@@ -406,7 +404,7 @@ export default function Home() {
                             </button>
                             <button
                               onClick={() => handleDeleteLog(log.log_id)}
-                              className="rounded-lg bg-red-600 px-3 py-2 text-white transition hover:bg-red-500"
+                              className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-rose-400 transition hover:bg-rose-500/20 hover:text-rose-300"
                             >
                               Delete
                             </button>
@@ -428,29 +426,29 @@ export default function Home() {
           </div>
 
           {/* Pagination */}
-          {logTotal > logPageSize && <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
-            <span>
-              {logTotal === 0
-                ? "0 entries"
-                : `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} of ${logTotal} entries`}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => fetchLogs(logPage - 1)}
-                disabled={logPage === 1}
-                className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ← Prev
-              </button>
-              <button
-                onClick={() => fetchLogs(logPage + 1)}
-                disabled={logPage * logPageSize >= logTotal}
-                className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next →
-              </button>
+          {logTotal > logPageSize && (
+            <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
+              <span>
+                {(logPage - 1) * logPageSize + 1}–{Math.min(logPage * logPageSize, logTotal)} of {logTotal} entries
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchLogs(logPage - 1)}
+                  disabled={logPage === 1}
+                  className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ← Prev
+                </button>
+                <button
+                  onClick={() => fetchLogs(logPage + 1)}
+                  disabled={logPage * logPageSize >= logTotal}
+                  className="rounded-lg border border-white/10 px-3 py-2 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
-          </div>}
+          )}
         </section>
       </div>
 
@@ -543,11 +541,10 @@ export default function Home() {
               )}
 
               <div className="flex flex-wrap gap-3">
-                <input
-                  type="date"
+                <DatePicker
                   value={logForm.dateConsumed}
-                  onChange={(e) => setLogForm((p) => ({ ...p, dateConsumed: e.target.value }))}
-                  className={`flex-1 min-w-[160px] ${inputClass}`}
+                  onChange={(v) => setLogForm((p) => ({ ...p, dateConsumed: v }))}
+                  className="flex-1 min-w-[160px]"
                 />
                 <input
                   type="number"
