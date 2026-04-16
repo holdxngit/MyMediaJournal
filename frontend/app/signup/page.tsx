@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { getApiBaseUrl } from "../api";
 
@@ -41,6 +41,12 @@ export default function SignupPage() {
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/auth/me`, { credentials: "include" }).then((res) => {
+      if (res.ok) router.replace("/");
+    });
+  }, [apiBaseUrl, router]);
 
   const handleChange = (
     field: "name" | "email" | "password" | "confirmPassword",
