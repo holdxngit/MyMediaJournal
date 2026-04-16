@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .auth import (
@@ -21,6 +22,7 @@ from .schemas import (
     ConsumptionLogUpdate,
     ConsumptionLogResponse,
     PaginatedLogsResponse,
+    LogStatsResponse,
     LoginRequest,
     SignupRequest,
     UserResponse,
@@ -161,6 +163,36 @@ def get_media(
 
     items = query.order_by(MediaItem.media_id).all()
     return [serialize_media_item(item) for item in items]
+
+
+@app.get("/logs/stats", response_model=LogStatsResponse)
+def get_log_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    base = db.query(ConsumptionLog).filter(
+        ConsumptionLog.user_id == current_user.user_id,
+        ConsumptionLog.media_id.isnot(None),
+    )
+
+    totals = base.with_entities(
+        func.count(ConsumptionLog.log_id),
+        func.sum(ConsumptionLog.time_consumed),
+    ).one()
+
+    top_type = (
+        base.join(MediaItem)
+        .with_entities(MediaItem.media_type, func.count(ConsumptionLog.log_id).label("n"))
+        .group_by(MediaItem.media_type)
+        .order_by(func.count(ConsumptionLog.log_id).desc())
+        .first()
+    )
+
+    return {
+        "total_entries": totals[0] or 0,
+        "total_minutes": totals[1] or 0,
+        "top_media_type": top_type[0] if top_type else None,
+    }
 
 
 PAGE_SIZE = 9

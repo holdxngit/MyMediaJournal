@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import { getApiBaseUrl } from "./api";
 import { DatePicker } from "./DatePicker";
+import { Nav } from "./Nav";
 
 type MediaItem = {
   media_id: number;
@@ -50,6 +51,7 @@ export default function Home() {
   const [logPage, setLogPage] = useState(1);
   const [logTotal, setLogTotal] = useState(0);
   const [logPageSize, setLogPageSize] = useState(20);
+  const [logStats, setLogStats] = useState<{ total_entries: number; total_minutes: number; top_media_type: string | null } | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +70,16 @@ export default function Home() {
   const [logForm, setLogForm] = useState({ dateConsumed: "", timeHours: "", timeMinutes: "" });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/logs/stats`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (res.ok) setLogStats(await res.json());
+    } catch { /* stats are non-critical */ }
+  }, [apiBaseUrl]);
 
   const fetchLogs = useCallback(async (page = 1) => {
     try {
@@ -124,6 +136,7 @@ export default function Home() {
         const [genresRes] = await Promise.all([
           fetch(`${apiBaseUrl}/genres`),
           fetchLogs(),
+          fetchStats(),
         ]);
         if (genresRes.ok) setGenres(await genresRes.json());
       } catch {
@@ -133,7 +146,7 @@ export default function Home() {
       }
     };
     init();
-  }, [apiBaseUrl, fetchLogs, router]);
+  }, [apiBaseUrl, fetchLogs, fetchStats, router]);
 
   useEffect(() => {
     if (showModal) fetchModalCatalog();
@@ -190,7 +203,7 @@ export default function Home() {
         }),
       });
       if (!res.ok) throw new Error();
-      await fetchLogs(1);
+      await Promise.all([fetchLogs(1), fetchStats()]);
       closeModal();
     } catch {
       setModalError("Could not save log entry.");
@@ -233,7 +246,7 @@ export default function Home() {
       if (!res.ok) throw new Error();
       if (editingLogId === id) setEditingLogId(null);
       const targetPage = logs.length === 1 && logPage > 1 ? logPage - 1 : logPage;
-      await fetchLogs(targetPage);
+      await Promise.all([fetchLogs(targetPage), fetchStats()]);
     } catch {
       setError("Could not delete log entry.");
     }
@@ -257,32 +270,19 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#0a0a12] via-[#0f0f1a] to-[#15152a] px-6 py-10 text-white">
-      <div className="mx-auto max-w-6xl">
+    <div className="flex min-h-screen bg-gradient-to-br from-[#0a0a12] via-[#0f0f1a] to-[#15152a] text-white">
+      <Nav user={user} onLogout={handleLogout} />
+
+      <main className="ml-56 flex-1 px-8 py-10">
+        <div className="mx-auto max-w-5xl">
 
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-  <div>
-    <h1 className="bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-4xl font-semibold tracking-tight text-transparent">
-      Media Journal
-    </h1>
-    <p className="mt-2 text-gray-400">Track what you&apos;ve watched, played, or read.</p>
-  </div>
-
-  <div className="flex items-center gap-3">
-    {user && (
-      <span className="hidden text-sm text-gray-400 sm:inline">
-        {user.name || user.email}
-      </span>
-    )}
-    <button
-      onClick={handleLogout}
-      className="rounded-xl border border-white/10 bg-[#1a1a2e] px-4 py-2 text-sm font-medium text-white transition hover:border-violet-500 hover:bg-[#23233a]"
-    >
-      Logout
-    </button>
-  </div>
-</div>
+        <div className="mb-8">
+          <h1 className="bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+            My Journal
+          </h1>
+          <p className="mt-1 text-sm text-gray-400">Track what you&apos;ve watched, played, or read.</p>
+        </div>
 
         {error && (
           <p className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -292,11 +292,22 @@ export default function Home() {
 
         {/* My Journal */}
         <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">My Journal</h2>
+          {/* Stats bar + actions row */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-6 text-sm text-gray-400">
+              <span>
+                Entries: <span className="font-semibold text-white">{logStats?.total_entries ?? 0}</span>
+              </span>
+              <span>
+                Hours logged: <span className="font-semibold text-white">{logStats ? formatDuration(logStats.total_minutes) : "0m"}</span>
+              </span>
+              <span>
+                Top type: <span className="font-semibold text-violet-300">{logStats?.top_media_type ?? "N/A"}</span>
+              </span>
+            </div>
             <div className="flex gap-3">
               <button
-                onClick={fetchLogs}
+                onClick={() => { fetchLogs(logPage); fetchStats(); }}
                 className="rounded-lg bg-[#1a1a2e] px-4 py-2 text-sm text-violet-200 transition hover:bg-[#23233a]"
               >
                 Refresh
@@ -584,6 +595,7 @@ export default function Home() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </div>
   );
 }

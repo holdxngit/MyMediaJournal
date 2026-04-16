@@ -53,3 +53,9 @@ class PaginatedLogsResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class LogStatsResponse(BaseModel):
+    total_entries: int
+    total_minutes: int
+    top_media_type: str | None
