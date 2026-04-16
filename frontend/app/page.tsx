@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
-const DEMO_USER_ID = 1;
+import { getApiBaseUrl } from "./api";
 
 type MediaItem = {
   media_id: number;
@@ -23,6 +22,12 @@ type LogEntry = {
   time_consumed: number;
 };
 
+type User = {
+  user_id: number;
+  name: string | null;
+  email: string;
+};
+
 function formatDuration(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -37,6 +42,9 @@ const inputClass =
 const MEDIA_TYPES = ["Movie", "Show", "Anime", "Game", "Book", "Manga", "Other"];
 
 export default function Home() {
+  const router = useRouter();
+  const apiBaseUrl = getApiBaseUrl();
+  const [user, setUser] = useState<User | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,15 +67,20 @@ export default function Home() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/logs?user_id=${DEMO_USER_ID}`, {
+      const res = await fetch(`${apiBaseUrl}/logs`, {
         cache: "no-store",
+        credentials: "include",
       });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
       if (!res.ok) throw new Error();
       setLogs(await res.json());
     } catch {
       setError("Could not load journal entries.");
     }
-  }, []);
+  }, [apiBaseUrl, router]);
 
   const fetchModalCatalog = useCallback(async () => {
     try {
@@ -75,7 +88,7 @@ export default function Home() {
       if (modalMediaType) params.set("media_type", modalMediaType);
       if (modalGenre) params.set("genre", modalGenre);
       const qs = params.toString();
-      const res = await fetch(`${API_BASE_URL}/media${qs ? `?${qs}` : ""}`, {
+      const res = await fetch(`${apiBaseUrl}/media${qs ? `?${qs}` : ""}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error();
@@ -83,23 +96,36 @@ export default function Home() {
     } catch {
       setModalError("Could not load media catalog.");
     }
-  }, [modalMediaType, modalGenre]);
+  }, [apiBaseUrl, modalMediaType, modalGenre]);
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
       try {
+        const meRes = await fetch(`${apiBaseUrl}/auth/me`, {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (meRes.status === 401) {
+          router.push("/login");
+          return;
+        }
+        if (!meRes.ok) throw new Error();
+        setUser(await meRes.json());
+
         const [genresRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/genres`),
+          fetch(`${apiBaseUrl}/genres`),
           fetchLogs(),
         ]);
         if (genresRes.ok) setGenres(await genresRes.json());
+      } catch {
+        setError("Could not load your account.");
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, [fetchLogs]);
+  }, [apiBaseUrl, fetchLogs, router]);
 
   useEffect(() => {
     if (showModal) fetchModalCatalog();
@@ -145,11 +171,11 @@ export default function Home() {
     try {
       setSubmitting(true);
       setModalError("");
-      const res = await fetch(`${API_BASE_URL}/logs`, {
+      const res = await fetch(`${apiBaseUrl}/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          user_id: DEMO_USER_ID,
           media_id: selectedItem.media_id,
           date_consumed: logForm.dateConsumed,
           time_consumed: totalMinutes,
@@ -173,9 +199,10 @@ export default function Home() {
     }
     try {
       setError("");
-      const res = await fetch(`${API_BASE_URL}/logs/${id}`, {
+      const res = await fetch(`${apiBaseUrl}/logs/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           date_consumed: editLog.dateConsumed,
           time_consumed: editLog.timeConsumed,
@@ -193,13 +220,25 @@ export default function Home() {
   const handleDeleteLog = async (id: number) => {
     try {
       setError("");
-      const res = await fetch(`${API_BASE_URL}/logs/${id}`, { method: "DELETE" });
+      const res = await fetch(`${apiBaseUrl}/logs/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error();
       setLogs((prev) => prev.filter((l) => l.log_id !== id));
       if (editingLogId === id) setEditingLogId(null);
     } catch {
       setError("Could not delete log entry.");
     }
+  };
+
+  const handleLogout = async () => {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    router.push("/login");
+    router.refresh();
   };
 
   if (loading) {
@@ -223,19 +262,18 @@ export default function Home() {
     <p className="mt-2 text-gray-400">Track what you&apos;ve watched, played, or read.</p>
   </div>
 
-  <div className="flex gap-3">
-    <Link
-      href="/login"
+  <div className="flex items-center gap-3">
+    {user && (
+      <span className="hidden text-sm text-gray-400 sm:inline">
+        {user.name || user.email}
+      </span>
+    )}
+    <button
+      onClick={handleLogout}
       className="rounded-xl border border-white/10 bg-[#1a1a2e] px-4 py-2 text-sm font-medium text-white transition hover:border-violet-500 hover:bg-[#23233a]"
     >
-      Login
-    </Link>
-    <Link
-      href="/signup"
-      className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/30"
-    >
-      Sign Up
-    </Link>
+      Logout
+    </button>
   </div>
 </div>
 

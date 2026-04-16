@@ -1,6 +1,23 @@
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
+
+
+class UserResponse(BaseModel):
+    user_id: int
+    name: Optional[str] = None
+    email: EmailStr
+
+
+class SignupRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 
 class MediaItemResponse(BaseModel):
@@ -11,7 +28,6 @@ class MediaItemResponse(BaseModel):
 
 
 class ConsumptionLogCreate(BaseModel):
-    user_id: int = 1
     media_id: int
     date_consumed: date
     time_consumed: int

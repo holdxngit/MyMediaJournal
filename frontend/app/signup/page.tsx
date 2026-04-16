@@ -1,15 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { getApiBaseUrl } from "../api";
+
+type ApiValidationError = {
+  loc?: Array<string | number>;
+  msg?: string;
+};
+
+function formatApiError(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item: ApiValidationError) => {
+        const field = item.loc?.filter((part) => part !== "body").join(".");
+        return field && item.msg ? `${field}: ${item.msg}` : item.msg;
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return fallback;
+}
+
 export default function SignupPage() {
+  const router = useRouter();
+  const apiBaseUrl = getApiBaseUrl();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (
     field: "name" | "email" | "password" | "confirmPassword",
@@ -21,12 +52,40 @@ export default function SignupPage() {
     }));
   };
 
-  const handleSignup = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    console.log("Signup submitted:", formData);
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
-    // Later, connect this to your backend signup route
+    try {
+      setSubmitting(true);
+      setError("");
+      const res = await fetch(`${apiBaseUrl}/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(formatApiError(data, "Could not create account."));
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create account.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -43,6 +102,12 @@ export default function SignupPage() {
           </div>
 
           <form onSubmit={handleSignup} className="space-y-5">
+            {error && (
+              <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {error}
+              </p>
+            )}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-300">
                 Name
@@ -105,9 +170,10 @@ export default function SignupPage() {
 
             <button
               type="submit"
+              disabled={submitting}
               className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 font-medium text-white transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-violet-500/30"
             >
-              Create Account
+              {submitting ? "Creating account..." : "Create Account"}
             </button>
           </form>
 

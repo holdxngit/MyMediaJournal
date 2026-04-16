@@ -38,13 +38,18 @@ db_url = db_url.replace("postgresql+psycopg://", "postgresql://")
 with open(SEED_FILE) as f:
     seed = json.load(f)
 
+DEMO_PASSWORD_HASH = "pbkdf2_sha256$260000$bXltZWRpYWpvdXJuYWwtZGVtby1zYWx0$KWX+bt7xqfYOAF1HSSd0oYmaGZssMFqZcSkOZoadhjA="
+
 with psycopg.connect(db_url) as conn:
     with conn.cursor() as cur:
 
         for u in seed["users"]:
             cur.execute(
-                'INSERT INTO "user" (user_id, email) VALUES (%s, %s) ON CONFLICT DO NOTHING',
-                (u["user_id"], u["email"]),
+                """INSERT INTO "user" (user_id, email, password_hash)
+                   VALUES (%s, %s, %s)
+                   ON CONFLICT (email) DO UPDATE
+                   SET password_hash = COALESCE("user".password_hash, EXCLUDED.password_hash)""",
+                (u["user_id"], u["email"], DEMO_PASSWORD_HASH),
             )
         print(f"✓ {len(seed['users'])} users")
 

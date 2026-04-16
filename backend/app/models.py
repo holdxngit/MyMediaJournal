@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, PrimaryKeyConstraint
+from datetime import datetime
+
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, PrimaryKeyConstraint, String
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -10,11 +12,27 @@ class User(Base):
     __tablename__ = "user"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=True)
     email = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     logs = relationship("ConsumptionLog", back_populates="user")
     goals = relationship("Goal", back_populates="user")
     wrapped_reports = relationship("WrappedReport", back_populates="user")
+
+
+class UserSession(Base):
+    __tablename__ = "user_session"
+
+    session_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    token_hash = Column(String, nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="sessions")
 
 
 class Friendship(Base):

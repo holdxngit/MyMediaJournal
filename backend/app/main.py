@@ -1,19 +1,36 @@
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from .db import get_db
-from .models import MediaItem, MediaItemGenre, Genre, ConsumptionLog
+from .auth import (
+    SESSION_COOKIE_NAME,
+    create_session_cookie,
+    delete_current_session,
+    get_current_user,
+    hash_password,
+    validate_password,
+    verify_password,
+)
+from .db import ensure_dev_schema, get_db
+from .models import MediaItem, MediaItemGenre, Genre, ConsumptionLog, User
 from .schemas import (
     MediaItemResponse,
     ConsumptionLogCreate,
     ConsumptionLogUpdate,
     ConsumptionLogResponse,
+    LoginRequest,
+    SignupRequest,
+    UserResponse,
 )
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+def startup():
+    ensure_dev_schema()
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +65,14 @@ def serialize_log(log: ConsumptionLog) -> dict:
     }
 
 
+def serialize_user(user: User) -> dict:
+    return {
+        "user_id": user.user_id,
+        "name": user.name,
+        "email": user.email,
+    }
+
+
 @app.get("/")
 def read_root():
     return {"message": "Backend is running"}
@@ -56,6 +81,56 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.post("/auth/signup", response_model=UserResponse, status_code=201)
+def signup(payload: SignupRequest, response: Response, db: Session = Depends(get_db)):
+    validate_password(payload.password)
+
+    email = payload.email.lower()
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=409, detail="An account with that email already exists.")
+
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required.")
+
+    user = User(
+        name=name,
+        email=email,
+        password_hash=hash_password(payload.password),
+    )
+    db.add(user)
+    db.flush()
+    create_session_cookie(response, db, user)
+    db.refresh(user)
+    return serialize_user(user)
+
+
+@app.post("/auth/login", response_model=UserResponse)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    email = payload.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    create_session_cookie(response, db, user)
+    return serialize_user(user)
+
+
+@app.post("/auth/logout", status_code=204)
+def logout(
+    response: Response,
+    session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+    db: Session = Depends(get_db),
+):
+    delete_current_session(response, db, session_token)
+
+
+@app.get("/auth/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return serialize_user(current_user)
 
 
 @app.get("/genres", response_model=list[str])
@@ -88,10 +163,17 @@ def get_media(
 
 
 @app.get("/logs", response_model=list[ConsumptionLogResponse])
-def get_logs(user_id: int = 1, db: Session = Depends(get_db)):
+def get_logs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     logs = (
         db.query(ConsumptionLog)
-        .filter(ConsumptionLog.user_id == user_id)
+        .join(MediaItem)
+        .filter(
+            ConsumptionLog.user_id == current_user.user_id,
+            ConsumptionLog.media_id.isnot(None),
+        )
         .order_by(ConsumptionLog.date_consumed.desc())
         .all()
     )
@@ -99,12 +181,16 @@ def get_logs(user_id: int = 1, db: Session = Depends(get_db)):
 
 
 @app.post("/logs", response_model=ConsumptionLogResponse, status_code=201)
-def create_log(payload: ConsumptionLogCreate, db: Session = Depends(get_db)):
+def create_log(
+    payload: ConsumptionLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     media_item = db.query(MediaItem).filter(MediaItem.media_id == payload.media_id).first()
     if not media_item:
         raise HTTPException(status_code=404, detail="Media item not found")
 
-    log = ConsumptionLog(**payload.model_dump())
+    log = ConsumptionLog(**payload.model_dump(), user_id=current_user.user_id)
     db.add(log)
     db.commit()
     db.refresh(log)
@@ -112,8 +198,20 @@ def create_log(payload: ConsumptionLogCreate, db: Session = Depends(get_db)):
 
 
 @app.put("/logs/{log_id}", response_model=ConsumptionLogResponse)
-def update_log(log_id: int, payload: ConsumptionLogUpdate, db: Session = Depends(get_db)):
-    log = db.query(ConsumptionLog).filter(ConsumptionLog.log_id == log_id).first()
+def update_log(
+    log_id: int,
+    payload: ConsumptionLogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    log = (
+        db.query(ConsumptionLog)
+        .filter(
+            ConsumptionLog.log_id == log_id,
+            ConsumptionLog.user_id == current_user.user_id,
+        )
+        .first()
+    )
     if not log:
         raise HTTPException(status_code=404, detail="Log entry not found")
 
@@ -125,8 +223,19 @@ def update_log(log_id: int, payload: ConsumptionLogUpdate, db: Session = Depends
 
 
 @app.delete("/logs/{log_id}", status_code=204)
-def delete_log(log_id: int, db: Session = Depends(get_db)):
-    log = db.query(ConsumptionLog).filter(ConsumptionLog.log_id == log_id).first()
+def delete_log(
+    log_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    log = (
+        db.query(ConsumptionLog)
+        .filter(
+            ConsumptionLog.log_id == log_id,
+            ConsumptionLog.user_id == current_user.user_id,
+        )
+        .first()
+    )
     if not log:
         raise HTTPException(status_code=404, detail="Log entry not found")
 

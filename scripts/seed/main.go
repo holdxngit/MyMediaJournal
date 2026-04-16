@@ -93,6 +93,8 @@ type SeedData struct {
 	WrappedReports    []WrappedReport   `json:"wrapped_reports"`
 }
 
+const demoPasswordHash = "pbkdf2_sha256$260000$bXltZWRpYWpvdXJuYWwtZGVtby1zYWx0$KWX+bt7xqfYOAF1HSSd0oYmaGZssMFqZcSkOZoadhjA="
+
 func mustExec(ctx context.Context, conn *pgx.Conn, sql string, args ...any) {
 	if _, err := conn.Exec(ctx, sql, args...); err != nil {
 		log.Fatalf("query failed: %v\nSQL: %s", err, sql)
@@ -128,8 +130,11 @@ func main() {
 
 	for _, u := range seed.Users {
 		mustExec(ctx, conn,
-			`INSERT INTO "user" (user_id, email) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-			u.UserID, u.Email)
+			`INSERT INTO "user" (user_id, email, password_hash)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (email) DO UPDATE
+			 SET password_hash = COALESCE("user".password_hash, EXCLUDED.password_hash)`,
+			u.UserID, u.Email, demoPasswordHash)
 	}
 	fmt.Printf("✓ %d users\n", len(seed.Users))
 

@@ -1,13 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { getApiBaseUrl } from "../api";
+
+type ApiValidationError = {
+  loc?: Array<string | number>;
+  msg?: string;
+};
+
+function formatApiError(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item: ApiValidationError) => {
+        const field = item.loc?.filter((part) => part !== "body").join(".");
+        return field && item.msg ? `${field}: ${item.msg}` : item.msg;
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return fallback;
+}
 
 export default function LoginPage() {
+  const router = useRouter();
+  const apiBaseUrl = getApiBaseUrl();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (field: "email" | "password", value: string) => {
     setFormData((prev) => ({
@@ -16,12 +47,31 @@ export default function LoginPage() {
     }));
   };
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    console.log("Login submitted:", formData);
+    try {
+      setSubmitting(true);
+      setError("");
+      const res = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(formData),
+      });
 
-    // Later, connect this to your backend login route
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(formatApiError(data, "Could not sign in."));
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -38,7 +88,7 @@ export default function LoginPage() {
               </h1>
               <p className="mt-4 max-w-md text-sm leading-7 text-gray-300">
                 Keep track of the games, shows, movies, manga, and books you
-                spend time on — all in one place.
+                spend time on - all in one place.
               </p>
             </div>
 
@@ -61,6 +111,12 @@ export default function LoginPage() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5">
+                {error && (
+                  <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    {error}
+                  </p>
+                )}
+
                 <div>
                   <label
                     htmlFor="email"
@@ -80,21 +136,12 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label
-                      htmlFor="password"
-                      className="block text-sm font-medium text-gray-300"
-                    >
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      className="text-sm text-violet-300 transition hover:text-violet-200"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-
+                  <label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-medium text-gray-300"
+                  >
+                    Password
+                  </label>
                   <input
                     id="password"
                     type="password"
@@ -108,9 +155,10 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 font-medium text-white transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-violet-500/30"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 font-medium text-white transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Sign In
+                  {submitting ? "Signing in..." : "Sign In"}
                 </button>
               </form>
 
