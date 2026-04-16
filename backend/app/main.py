@@ -20,6 +20,7 @@ from .schemas import (
     ConsumptionLogCreate,
     ConsumptionLogUpdate,
     ConsumptionLogResponse,
+    PaginatedLogsResponse,
     LoginRequest,
     SignupRequest,
     UserResponse,
@@ -162,12 +163,15 @@ def get_media(
     return [serialize_media_item(item) for item in items]
 
 
-@app.get("/logs", response_model=list[ConsumptionLogResponse])
+PAGE_SIZE = 9
+
+@app.get("/logs", response_model=PaginatedLogsResponse)
 def get_logs(
+    page: int = 1,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    logs = (
+    base_query = (
         db.query(ConsumptionLog)
         .join(MediaItem)
         .filter(
@@ -175,9 +179,15 @@ def get_logs(
             ConsumptionLog.media_id.isnot(None),
         )
         .order_by(ConsumptionLog.date_consumed.desc())
-        .all()
     )
-    return [serialize_log(log) for log in logs]
+    total = base_query.count()
+    logs = base_query.offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).all()
+    return {
+        "items": [serialize_log(log) for log in logs],
+        "total": total,
+        "page": page,
+        "page_size": PAGE_SIZE,
+    }
 
 
 @app.post("/logs", response_model=ConsumptionLogResponse, status_code=201)

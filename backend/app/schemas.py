@@ -46,3 +46,10 @@ class ConsumptionLogResponse(BaseModel):
     media_type: str
     date_consumed: date
     time_consumed: int
+
+
+class PaginatedLogsResponse(BaseModel):
+    items: list[ConsumptionLogResponse]
+    total: int
+    page: int
+    page_size: int
