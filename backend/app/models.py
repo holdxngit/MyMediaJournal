@@ -16,6 +16,7 @@ class User(Base):
     email = Column(String, nullable=False, unique=True)
     password_hash = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    friend_code = Column(String(11), nullable=True, unique=True)
 
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     logs = relationship("ConsumptionLog", back_populates="user")

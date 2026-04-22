@@ -54,6 +54,31 @@ def ensure_auth_schema():
                 "ix_user_session_token_hash ON user_session (token_hash)"
             )
         )
+        conn.execute(
+            text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS friend_code VARCHAR(11)')
+        )
+        conn.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                ix_user_friend_code ON "user" (friend_code)
+                WHERE friend_code IS NOT NULL
+                """
+            )
+        )
+        # Backfill codes for existing users who don't have one yet
+        conn.execute(
+            text(
+                """
+                UPDATE "user"
+                SET friend_code = UPPER(
+                    SUBSTR(MD5(RANDOM()::TEXT), 1, 5) || '-' ||
+                    SUBSTR(MD5(RANDOM()::TEXT), 1, 5)
+                )
+                WHERE friend_code IS NULL
+                """
+            )
+        )
 
 
 def ensure_journal_schema():

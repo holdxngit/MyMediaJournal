@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 
 import { getApiBaseUrl } from "./api";
 import { DatePicker } from "./DatePicker";
@@ -278,12 +279,17 @@ export default function Home() {
         <div className="mx-auto max-w-5xl">
 
         {/* Header */}
-        <div className="mb-8">
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
           <h1 className="bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
             My Journal
           </h1>
           <p className="mt-1 text-sm text-gray-400">Track what you&apos;ve watched, played, or read.</p>
-        </div>
+        </motion.div>
 
         {error && (
           <p className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -294,7 +300,12 @@ export default function Home() {
         {/* My Journal */}
         <section>
           {/* Stats bar + actions row */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <motion.div
+            className="mb-4 flex flex-wrap items-center justify-between gap-4"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
             <div className="flex flex-wrap gap-6 text-sm text-gray-400">
               <span>
                 Entries: <span className="font-semibold text-white">{logStats?.total_entries ?? 0}</span>
@@ -332,11 +343,21 @@ export default function Home() {
                 + New Item
               </button>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
+          <motion.div
+            className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-violet-500/40 to-transparent"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.18 }}
+          />
 
-          <div className="overflow-x-auto">
+          <motion.div
+            className="overflow-x-auto"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.22 }}
+          >
             <table className="min-w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5 text-left text-sm uppercase tracking-wide text-gray-400">
@@ -353,91 +374,32 @@ export default function Home() {
                     key={log.log_id}
                     className="border-b border-white/5 text-sm text-gray-200 transition even:bg-white/[0.03] hover:bg-white/[0.07]"
                   >
-                    {editingLogId === log.log_id ? (
-                      <>
-                        <td className="px-4 py-4 font-medium text-gray-400">{log.title}</td>
-                        <td className="px-4 py-4 text-gray-400">{log.media_type}</td>
-                        <td className="px-4 py-4">
-                          <DatePicker
-                            value={editLog.dateConsumed}
-                            onChange={(v) => setEditLog((p) => ({ ...p, dateConsumed: v }))}
-                          />
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="Hrs"
-                              value={Math.floor(editLog.timeConsumed / 60)}
-                              onChange={(e) => {
-                                const h = parseInt(e.target.value) || 0;
-                                const m = editLog.timeConsumed % 60;
-                                setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
-                              }}
-                              className="w-16 rounded-lg border border-white/10 bg-[#1a1a2e] px-3 py-2 text-white outline-none focus:border-violet-500"
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="Min"
-                              value={editLog.timeConsumed % 60}
-                              onChange={(e) => {
-                                const m = parseInt(e.target.value) || 0;
-                                const h = Math.floor(editLog.timeConsumed / 60);
-                                setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
-                              }}
-                              className="w-16 rounded-lg border border-white/10 bg-[#1a1a2e] px-3 py-2 text-white outline-none focus:border-violet-500"
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSaveEdit(log.log_id)}
-                              className="rounded-lg bg-violet-600 px-3 py-2 text-white transition hover:bg-violet-500"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingLogId(null)}
-                              className="rounded-lg bg-gray-700 px-3 py-2 text-white transition hover:bg-gray-600"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-4 py-4 font-medium">{log.title}</td>
-                        <td className="px-4 py-4">{log.media_type}</td>
-                        <td className="px-4 py-4">{log.date_consumed}</td>
-                        <td className="px-4 py-4">{formatDuration(log.time_consumed)}</td>
-                        <td className="px-4 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingLogId(log.log_id);
-                                setEditLog({
-                                  dateConsumed: log.date_consumed,
-                                  timeConsumed: log.time_consumed,
-                                });
-                              }}
-                              className="rounded-lg bg-violet-600 px-3 py-2 text-white transition hover:bg-violet-500"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteLog(log.log_id)}
-                              className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-rose-400 transition hover:bg-rose-500/20 hover:text-rose-300"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    )}
+                    <td className="px-4 py-4 font-medium">{log.title}</td>
+                    <td className="px-4 py-4">{log.media_type}</td>
+                    <td className="px-4 py-4">{log.date_consumed}</td>
+                    <td className="px-4 py-4">{formatDuration(log.time_consumed)}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingLogId(log.log_id);
+                            setEditLog({
+                              dateConsumed: log.date_consumed,
+                              timeConsumed: log.time_consumed,
+                            });
+                          }}
+                          className="rounded-lg bg-violet-600 px-3 py-2 text-white transition hover:bg-violet-500"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLog(log.log_id)}
+                          className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-rose-400 transition hover:bg-rose-500/20 hover:text-rose-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {logs.length === 0 && (
@@ -449,7 +411,7 @@ export default function Home() {
                 )}
               </tbody>
             </table>
-          </div>
+          </motion.div>
 
           {/* Pagination */}
           {logTotal > logPageSize && (
@@ -477,6 +439,83 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      {/* Edit Modal */}
+      {editingLogId !== null && (() => {
+        const log = logs.find((l) => l.log_id === editingLogId);
+        if (!log) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setEditingLogId(null); }}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-violet-500/30 bg-[#0f0f1a] shadow-[0_0_60px_rgba(139,92,246,0.2)]">
+              <div className="border-b border-white/10 px-6 py-5">
+                <h2 className="text-lg font-semibold">Edit Entry</h2>
+                <p className="mt-0.5 text-sm text-gray-400">{log.title} &middot; {log.media_type}</p>
+              </div>
+              <div className="flex flex-col gap-4 px-6 py-5">
+                <div>
+                  <p className="mb-1.5 text-xs text-gray-500">Date</p>
+                  <DatePicker
+                    value={editLog.dateConsumed}
+                    onChange={(v) => setEditLog((p) => ({ ...p, dateConsumed: v }))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs text-gray-500">Time</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Hours"
+                      value={Math.floor(editLog.timeConsumed / 60)}
+                      onChange={(e) => {
+                        const h = parseInt(e.target.value) || 0;
+                        const m = editLog.timeConsumed % 60;
+                        setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
+                      }}
+                      className={`flex-1 ${inputClass}`}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Minutes"
+                      value={editLog.timeConsumed % 60}
+                      onChange={(e) => {
+                        const m = parseInt(e.target.value) || 0;
+                        const h = Math.floor(editLog.timeConsumed / 60);
+                        setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
+                      }}
+                      className={`flex-1 ${inputClass}`}
+                    />
+                  </div>
+                </div>
+                {error && (
+                  <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                    {error}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3 border-t border-white/10 px-6 py-4">
+                <button
+                  onClick={() => handleSaveEdit(editingLogId)}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 py-2.5 text-sm font-medium text-white transition hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/30"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingLogId(null)}
+                  className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-gray-400 transition hover:border-white/30 hover:text-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* New Item Modal */}
       {showModal && (

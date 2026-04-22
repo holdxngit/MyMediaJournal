@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 from .auth import (
@@ -15,6 +15,7 @@ from .auth import (
     verify_password,
 )
 from .db import ensure_dev_schema, get_db
+from .utils import generate_friend_code
 from .models import MediaItem, MediaItemGenre, Genre, ConsumptionLog, User
 from .schemas import (
     MediaItemResponse,
@@ -23,6 +24,7 @@ from .schemas import (
     ConsumptionLogResponse,
     PaginatedLogsResponse,
     LogStatsResponse,
+    WrappedResponse,
     LoginRequest,
     SignupRequest,
     UserResponse,
@@ -73,6 +75,8 @@ def serialize_user(user: User) -> dict:
         "user_id": user.user_id,
         "name": user.name,
         "email": user.email,
+        "friend_code": user.friend_code,
+        "created_at": user.created_at,
     }
 
 
@@ -103,6 +107,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         name=name,
         email=email,
         password_hash=hash_password(payload.password),
+        friend_code=generate_friend_code(),
     )
     db.add(user)
     db.flush()
@@ -192,6 +197,99 @@ def get_log_stats(
         "total_entries": totals[0] or 0,
         "total_minutes": totals[1] or 0,
         "top_media_type": top_type[0] if top_type else None,
+    }
+
+
+@app.get("/logs/wrapped", response_model=WrappedResponse)
+def get_wrapped(
+    period: str = "all_time",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from datetime import date as date_type
+    today = date_type.today()
+
+    base = db.query(ConsumptionLog).filter(
+        ConsumptionLog.user_id == current_user.user_id,
+        ConsumptionLog.media_id.isnot(None),
+    )
+    if period == "this_year":
+        base = base.filter(extract("year", ConsumptionLog.date_consumed) == today.year)
+    elif period == "this_month":
+        base = base.filter(
+            extract("year", ConsumptionLog.date_consumed) == today.year,
+            extract("month", ConsumptionLog.date_consumed) == today.month,
+        )
+
+    totals = base.with_entities(
+        func.count(ConsumptionLog.log_id),
+        func.sum(ConsumptionLog.time_consumed),
+    ).one()
+
+    top_type = (
+        base.join(MediaItem)
+        .with_entities(MediaItem.media_type, func.count(ConsumptionLog.log_id).label("n"))
+        .group_by(MediaItem.media_type)
+        .order_by(func.count(ConsumptionLog.log_id).desc())
+        .first()
+    )
+
+    top_item = (
+        base.join(MediaItem)
+        .with_entities(
+            MediaItem.title,
+            MediaItem.media_type,
+            func.sum(ConsumptionLog.time_consumed).label("total_minutes"),
+        )
+        .group_by(MediaItem.media_id, MediaItem.title, MediaItem.media_type)
+        .order_by(func.sum(ConsumptionLog.time_consumed).desc())
+        .first()
+    )
+
+    type_breakdown = (
+        base.join(MediaItem)
+        .with_entities(
+            MediaItem.media_type,
+            func.count(ConsumptionLog.log_id).label("count"),
+            func.sum(ConsumptionLog.time_consumed).label("minutes"),
+        )
+        .group_by(MediaItem.media_type)
+        .order_by(func.count(ConsumptionLog.log_id).desc())
+        .all()
+    )
+
+    longest_session = (
+        base.with_entities(func.max(ConsumptionLog.time_consumed)).scalar() or 0
+    )
+
+    activity_by_day = (
+        base.with_entities(
+            ConsumptionLog.date_consumed,
+            func.count(ConsumptionLog.log_id).label("count"),
+        )
+        .group_by(ConsumptionLog.date_consumed)
+        .order_by(ConsumptionLog.date_consumed)
+        .all()
+    )
+
+    return {
+        "total_entries": totals[0] or 0,
+        "total_minutes": totals[1] or 0,
+        "top_media_type": top_type[0] if top_type else None,
+        "longest_session_minutes": longest_session,
+        "top_item": {
+            "title": top_item[0],
+            "media_type": top_item[1],
+            "minutes": top_item[2] or 0,
+        } if top_item else None,
+        "type_breakdown": [
+            {"media_type": row[0], "count": row[1], "minutes": row[2] or 0}
+            for row in type_breakdown
+        ],
+        "activity_by_day": [
+            {"date": str(row[0]), "count": row[1]}
+            for row in activity_by_day
+        ],
     }
 
 
