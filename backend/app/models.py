@@ -33,7 +33,7 @@ class User(Base):
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     logs = relationship("ConsumptionLog", back_populates="user")
     goals = relationship("Goal", back_populates="user")
-    wrapped_reports = relationship("WrappedReport", back_populates="user")
+
 
 
 class UserSession(Base):
@@ -148,13 +148,3 @@ class Goal(Base):
     user = relationship("User", back_populates="goals")
     priority = relationship("Priority", back_populates="goals")
 
-
-class WrappedReport(Base):
-    __tablename__ = "wrapped_report"
-
-    report_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
-    most_used_media = Column(Integer, ForeignKey("media_item.media_id"), nullable=True)
-    goal = Column(Integer, ForeignKey("goal.goal_id"), nullable=True)
-
-    user = relationship("User", back_populates="wrapped_reports")

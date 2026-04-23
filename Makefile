@@ -40,7 +40,7 @@ migration:
 	cd $(BACKEND_DIR) && venv/bin/alembic revision --autogenerate -m "$(name)"
 
 dev-backend:
-	cd $(BACKEND_DIR) && venv/bin/uvicorn app.main:app --reload
+	cd $(BACKEND_DIR) && venv/bin/alembic upgrade head && venv/bin/uvicorn app.main:app --reload
 
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm run dev

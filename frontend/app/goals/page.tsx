@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Nav } from "../Nav";
@@ -298,7 +299,12 @@ export default function GoalsPage() {
         <div className="mx-auto max-w-5xl">
 
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between gap-4">
+        <motion.div
+          className="mb-8 flex items-start justify-between gap-4"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-violet-400">Goals</h1>
             <p className="mt-1 text-sm text-gray-400">
@@ -306,7 +312,7 @@ export default function GoalsPage() {
             </p>
           </div>
 
-          {/* Sort controls */}
+          {/* Sort controls  */}
           <div className="flex items-center gap-1 rounded-xl bg-white/[0.04] p-1">
             {(["date", "priority", "alpha"] as SortKey[]).map((key) => (
               <button
@@ -322,9 +328,13 @@ export default function GoalsPage() {
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        <div>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <AddGoalForm onAdd={(g) => setGoals((prev) => [...prev, g])} />
 
           {goals.length === 0 ? (
@@ -354,7 +364,7 @@ export default function GoalsPage() {
               )}
             </div>
           )}
-        </div>
+        </motion.div>
         </div>
       </main>
     </div>

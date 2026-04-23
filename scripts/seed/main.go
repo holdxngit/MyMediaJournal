@@ -72,13 +72,6 @@ type Goal struct {
 	StartDate string  `json:"start_date"`
 }
 
-type WrappedReport struct {
-	ReportID      int  `json:"report_id"`
-	UserID        int  `json:"user_id"`
-	MostUsedMedia *int `json:"most_used_media"`
-	Goal          *int `json:"goal"`
-}
-
 type SeedData struct {
 	Users             []User            `json:"users"`
 	Genres            []Genre           `json:"genres"`
@@ -90,7 +83,6 @@ type SeedData struct {
 	GenreSimilarities []GenreSimilarity `json:"genre_similarities"`
 	ConsumptionLogs   []ConsumptionLog  `json:"consumption_logs"`
 	Goals             []Goal            `json:"goals"`
-	WrappedReports    []WrappedReport   `json:"wrapped_reports"`
 }
 
 const demoPasswordHash = "pbkdf2_sha256$260000$bXltZWRpYWpvdXJuYWwtZGVtby1zYWx0$KWX+bt7xqfYOAF1HSSd0oYmaGZssMFqZcSkOZoadhjA="
@@ -203,22 +195,12 @@ func main() {
 	}
 	fmt.Printf("✓ %d goals\n", len(seed.Goals))
 
-	for _, wr := range seed.WrappedReports {
-		mustExec(ctx, conn,
-			`INSERT INTO wrapped_report (report_id, user_id, most_used_media, goal)
-			 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-			wr.ReportID, wr.UserID, wr.MostUsedMedia, wr.Goal)
-	}
-	fmt.Printf("✓ %d wrapped reports\n", len(seed.WrappedReports))
-
 	for _, q := range []string{
 		`SELECT setval(pg_get_serial_sequence('"user"', 'user_id'), COALESCE(MAX(user_id), 1)) FROM "user"`,
 		`SELECT setval(pg_get_serial_sequence('genre', 'genre_id'), COALESCE(MAX(genre_id), 1)) FROM genre`,
-		`SELECT setval(pg_get_serial_sequence('source', 'source_id'), COALESCE(MAX(source_id), 1)) FROM source`,
 		`SELECT setval(pg_get_serial_sequence('media_item', 'media_id'), COALESCE(MAX(media_id), 1)) FROM media_item`,
 		`SELECT setval(pg_get_serial_sequence('consumption_log', 'log_id'), COALESCE(MAX(log_id), 1)) FROM consumption_log`,
 		`SELECT setval(pg_get_serial_sequence('goal', 'goal_id'), COALESCE(MAX(goal_id), 1)) FROM goal`,
-		`SELECT setval(pg_get_serial_sequence('wrapped_report', 'report_id'), COALESCE(MAX(report_id), 1)) FROM wrapped_report`,
 	} {
 		if _, err := conn.Exec(ctx, q); err != nil {
 			log.Printf("warning: sequence reset failed: %v", err)

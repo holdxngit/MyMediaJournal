@@ -511,7 +511,12 @@ export default function FriendsPage() {
     <div className="flex h-screen overflow-hidden bg-[#08080f] text-white">
       <Nav user={user} onLogout={handleLogout} onUserUpdate={setUser} />
 
-      <div className="ml-56 flex flex-1 overflow-hidden">
+      <motion.div
+        className="ml-56 flex flex-1 overflow-hidden"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+      >
         {/* ── Left panel ───────────────────────────────────────────────────────── */}
         <aside className="flex w-72 shrink-0 flex-col border-r border-white/[0.06] bg-[#08080f]">
 
@@ -693,7 +698,7 @@ export default function FriendsPage() {
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}
       <AnimatePresence>
