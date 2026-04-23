@@ -1,0 +1,12 @@
+[
+    {
+        "title": "Sample1",
+        "media_type": "Show",
+        "genres": [4, 11]
+    },
+    {
+        "title": "Sample2",
+        "media_type": "Game",
+        "genres": [4, 3]
+    }
+]
