@@ -8,6 +8,15 @@ class Base(DeclarativeBase):
     pass
 
 
+class Role(Base):
+    __tablename__ = "role"
+
+    role_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), nullable=False, unique=True)
+
+    users = relationship("User", back_populates="role")
+
+
 class User(Base):
     __tablename__ = "user"
 
@@ -17,7 +26,10 @@ class User(Base):
     password_hash = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     friend_code = Column(String(11), nullable=True, unique=True)
+    avatar_url = Column(String, nullable=True)
+    role_id = Column(Integer, ForeignKey("role.role_id"), nullable=True)
 
+    role = relationship("Role", back_populates="users")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     logs = relationship("ConsumptionLog", back_populates="user")
     goals = relationship("Goal", back_populates="user")
@@ -43,6 +55,31 @@ class Friendship(Base):
     friend_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
     user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
     date_friended = Column(Date, nullable=False)
+
+
+class FriendRequest(Base):
+    __tablename__ = "friend_request"
+
+    request_id = Column(Integer, primary_key=True, autoincrement=True)
+    sender_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    receiver = relationship("User", foreign_keys=[receiver_id])
+
+
+class Message(Base):
+    __tablename__ = "message"
+
+    message_id = Column(Integer, primary_key=True, autoincrement=True)
+    sender_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    content = Column(String, nullable=False)
+    sent_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    receiver = relationship("User", foreign_keys=[receiver_id])
 
 
 class Genre(Base):

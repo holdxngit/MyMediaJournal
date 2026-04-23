@@ -9,6 +9,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     friend_code: Optional[str] = None
     created_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
+    role: Optional[str] = None
 
 
 class SignupRequest(BaseModel):
@@ -78,6 +80,40 @@ class TypeBreakdownItem(BaseModel):
 class ActivityDay(BaseModel):
     date: str  # YYYY-MM-DD
     count: int
+
+
+class FriendResponse(BaseModel):
+    user_id: int
+    name: Optional[str] = None
+    email: EmailStr
+    avatar_url: Optional[str] = None
+    friend_code: Optional[str] = None
+
+
+class FriendRequestResponse(BaseModel):
+    request_id: int
+    sender_id: int
+    sender_name: Optional[str] = None
+    sender_email: EmailStr
+    sender_avatar_url: Optional[str] = None
+    created_at: datetime
+
+
+class SendFriendRequestPayload(BaseModel):
+    friend_code: str = Field(min_length=1)
+
+
+class SendRequestResult(BaseModel):
+    status: str
+    message: Optional[str] = None
+
+
+class MessageResponse(BaseModel):
+    message_id: int
+    sender_id: int
+    receiver_id: int
+    content: str
+    sent_at: datetime
 
 
 class WrappedResponse(BaseModel):

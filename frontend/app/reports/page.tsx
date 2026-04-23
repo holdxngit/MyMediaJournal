@@ -9,7 +9,7 @@ import { Nav } from "../Nav";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type User = { user_id: number; name: string | null; email: string };
+type User = { user_id: number; name: string | null; email: string; friend_code: string | null; created_at: string | null; avatar_url: string | null; role: string | null };
 type TypeBreakdown = { media_type: string; count: number; minutes: number };
 type ActivityDay = { date: string; count: number };
 type TopItem = { title: string; media_type: string; minutes: number };
@@ -353,7 +353,7 @@ export default function Reports() {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-[#0a0a12] via-[#0f0f1a] to-[#15152a] text-white">
-      <Nav user={user} onLogout={handleLogout} />
+      <Nav user={user} onLogout={handleLogout} onUserUpdate={setUser} />
 
       <main className="ml-56 flex-1 px-8 py-10">
         <div className="mx-auto max-w-5xl">

@@ -118,6 +118,15 @@ def get_current_user(
     return session.user
 
 
+def get_user_from_token(token: str, db: Session) -> User | None:
+    """Non-raising auth for WebSocket connections."""
+    token_hash = _hash_session_token(token)
+    session = db.query(UserSession).filter(UserSession.token_hash == token_hash).first()
+    if not session or session.expires_at <= _utcnow():
+        return None
+    return session.user
+
+
 def delete_current_session(
     response: Response,
     db: Session,

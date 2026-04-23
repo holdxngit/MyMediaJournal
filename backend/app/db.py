@@ -58,6 +58,9 @@ def ensure_auth_schema():
             text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS friend_code VARCHAR(11)')
         )
         conn.execute(
+            text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS avatar_url VARCHAR')
+        )
+        conn.execute(
             text(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS
@@ -134,6 +137,80 @@ def ensure_journal_schema():
         )
 
 
+def ensure_roles_schema():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS role (
+                    role_id SERIAL PRIMARY KEY,
+                    name VARCHAR(50) NOT NULL UNIQUE
+                )
+                """
+            )
+        )
+        conn.execute(text("INSERT INTO role (name) VALUES ('user') ON CONFLICT DO NOTHING"))
+        conn.execute(text("INSERT INTO role (name) VALUES ('admin') ON CONFLICT DO NOTHING"))
+        conn.execute(
+            text(
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role_id INTEGER REFERENCES role(role_id)'
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE "user"
+                SET role_id = (SELECT role_id FROM role WHERE name = 'user')
+                WHERE role_id IS NULL
+                """
+            )
+        )
+
+
+def ensure_friends_schema():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS friend_request (
+                    request_id SERIAL PRIMARY KEY,
+                    sender_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+                    receiver_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    UNIQUE (sender_id, receiver_id)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS message (
+                    message_id SERIAL PRIMARY KEY,
+                    sender_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+                    receiver_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+                    content TEXT NOT NULL,
+                    sent_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_message_sender_receiver "
+                "ON message (sender_id, receiver_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE friendship "
+                "ADD COLUMN IF NOT EXISTS date_friended DATE NOT NULL DEFAULT CURRENT_DATE"
+            )
+        )
+
+
 def ensure_dev_schema():
+    ensure_roles_schema()
     ensure_auth_schema()
     ensure_journal_schema()
+    ensure_friends_schema()

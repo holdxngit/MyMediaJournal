@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { getApiBaseUrl } from "./api";
 
 type User = {
   user_id: number;
@@ -10,11 +11,14 @@ type User = {
   email: string;
   friend_code: string | null;
   created_at: string | null;
+  avatar_url: string | null;
+  role: string | null;
 };
 
 type Props = {
   user: User | null;
   onLogout: () => void;
+  onUserUpdate: (user: User) => void;
 };
 
 function BookIcon() {
@@ -57,9 +61,9 @@ function LogoutIcon() {
   );
 }
 
-function UserIcon() {
+function DefaultAvatarIcon({ size = 28 }: { size?: number }) {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
@@ -83,6 +87,15 @@ function CheckIcon() {
   );
 }
 
+function CameraIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", {
@@ -92,8 +105,41 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function SettingsModal({ user, onClose }: { user: User; onClose: () => void }) {
+function Avatar({ url, size }: { url: string | null; size: "sm" | "lg" }) {
+  const apiBase = getApiBaseUrl();
+  const dim = size === "sm" ? "h-7 w-7" : "h-16 w-16";
+  const iconSize = size === "sm" ? 15 : 28;
+
+  if (url) {
+    return (
+      <img
+        src={`${apiBase}${url}`}
+        alt="Profile"
+        className={`${dim} rounded-full object-cover`}
+      />
+    );
+  }
+
+  return (
+    <div className={`${dim} flex shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-violet-300`}>
+      <DefaultAvatarIcon size={iconSize} />
+    </div>
+  );
+}
+
+function SettingsModal({
+  user,
+  onClose,
+  onUserUpdate,
+}: {
+  user: User;
+  onClose: () => void;
+  onUserUpdate: (user: User) => void;
+}) {
+  const apiBase = getApiBaseUrl();
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleCopy() {
     if (!user.friend_code) return;
@@ -101,6 +147,31 @@ function SettingsModal({ user, onClose }: { user: User; onClose: () => void }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${apiBase}/auth/avatar`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Upload failed.");
+        return;
+      }
+      const updated: User = await res.json();
+      onUserUpdate(updated);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (
@@ -126,14 +197,38 @@ function SettingsModal({ user, onClose }: { user: User; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Avatar */}
-        <div className="mb-5 flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/20 text-violet-300">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
+        {/* Avatar upload */}
+        <div className="mb-5 flex flex-col items-center gap-2">
+          <div className="relative">
+            {user.avatar_url ? (
+              <img
+                src={`${apiBase}${user.avatar_url}`}
+                alt="Profile"
+                className="h-16 w-16 rounded-full object-cover ring-2 ring-white/10"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/20 text-violet-300 ring-2 ring-white/10">
+                <DefaultAvatarIcon size={28} />
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow-md transition hover:bg-violet-500 disabled:opacity-50"
+            >
+              <CameraIcon />
+            </button>
           </div>
+          <p className="text-[10px] text-gray-600">
+            {uploading ? "Uploading…" : "Click to change photo"}
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
 
         {/* Fields */}
@@ -151,6 +246,17 @@ function SettingsModal({ user, onClose }: { user: User; onClose: () => void }) {
           <div className="rounded-xl bg-white/[0.04] px-4 py-3">
             <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Member since</p>
             <p className="text-sm text-gray-200">{formatDate(user.created_at)}</p>
+          </div>
+
+          <div className="rounded-xl bg-white/[0.04] px-4 py-3">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Role</p>
+            <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
+              user.role === "admin"
+                ? "bg-amber-500/15 text-amber-400"
+                : "bg-violet-500/15 text-violet-300"
+            }`}>
+              {user.role || "user"}
+            </span>
           </div>
 
           <div className="rounded-xl bg-white/[0.04] px-4 py-3">
@@ -182,14 +288,14 @@ function SettingsModal({ user, onClose }: { user: User; onClose: () => void }) {
   );
 }
 
-export function Nav({ user, onLogout }: Props) {
+export function Nav({ user, onLogout, onUserUpdate }: Props) {
   const pathname = usePathname();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const navItems = [
     { href: "/", label: "Journal", icon: <BookIcon />, active: pathname === "/", soon: false },
     { href: "/reports", label: "Reports", icon: <BarChartIcon />, active: pathname === "/reports", soon: false },
-    { href: "/friends", label: "Friends", icon: <FriendsIcon />, active: false, soon: true },
+    { href: "/friends", label: "Friends", icon: <FriendsIcon />, active: pathname === "/friends", soon: false },
   ];
 
   return (
@@ -263,9 +369,7 @@ export function Nav({ user, onLogout }: Props) {
                 onClick={() => setSettingsOpen(true)}
                 className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-1 pt-1 pb-1 text-left transition hover:bg-white/[0.04]"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-violet-300">
-                  <UserIcon />
-                </div>
+                <Avatar url={user.avatar_url} size="sm" />
                 <div className="min-w-0">
                   <p className="truncate text-xs font-medium text-gray-200">
                     {user.name || user.email}
@@ -288,7 +392,13 @@ export function Nav({ user, onLogout }: Props) {
       </aside>
 
       {settingsOpen && user && (
-        <SettingsModal user={user} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal
+          user={user}
+          onClose={() => setSettingsOpen(false)}
+          onUserUpdate={(updated) => {
+            onUserUpdate(updated);
+          }}
+        />
       )}
     </>
   );
