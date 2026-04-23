@@ -1,0 +1,81 @@
+{
+  "roles": [
+    {"role_id": 1, "name": "user"},
+    {"role_id": 2, "name": "admin"}
+  ],
+  "priorities": [
+    {"priority_id": 1, "name": "Low"},
+    {"priority_id": 2, "name": "Medium"},
+    {"priority_id": 3, "name": "High"}
+  ],
+  "users": [
+    {"user_id": 1, "name": "Alice",  "email": "alice@example.com",  "role_id": 1},
+    {"user_id": 2, "name": "Bob",    "email": "bob@example.com",    "role_id": 1},
+    {"user_id": 3, "name": "Carol",  "email": "carol@example.com",  "role_id": 1},
+    {"user_id": 4, "name": "Dave",   "email": "dave@example.com",   "role_id": 1},
+    {"user_id": 5, "name": "Admin",  "email": "admin@example.com",  "role_id": 2}
+  ],
+  "user_sessions": [
+    {"session_id": 1, "user_id": 1, "token_hash": "tok_alice_abc123",  "expires_at": "2026-12-31T00:00:00Z"},
+    {"session_id": 2, "user_id": 2, "token_hash": "tok_bob_def456",    "expires_at": "2026-12-31T00:00:00Z"},
+    {"session_id": 3, "user_id": 3, "token_hash": "tok_carol_ghi789",  "expires_at": "2026-12-31T00:00:00Z"},
+    {"session_id": 4, "user_id": 4, "token_hash": "tok_dave_jkl012",   "expires_at": "2026-12-31T00:00:00Z"},
+    {"session_id": 5, "user_id": 5, "token_hash": "tok_admin_mno345",  "expires_at": "2026-12-31T00:00:00Z"}
+  ],
+  "friendships": [
+    {"user_id": 1, "friend_id": 2, "date_friended": "2025-01-10"},
+    {"user_id": 1, "friend_id": 3, "date_friended": "2025-02-14"},
+    {"user_id": 2, "friend_id": 3, "date_friended": "2025-03-05"},
+    {"user_id": 2, "friend_id": 4, "date_friended": "2025-04-20"},
+    {"user_id": 3, "friend_id": 4, "date_friended": "2025-05-01"}
+  ],
+  "friend_requests": [
+    {"request_id": 1, "sender_id": 1, "receiver_id": 4},
+    {"request_id": 2, "sender_id": 2, "receiver_id": 5},
+    {"request_id": 3, "sender_id": 3, "receiver_id": 5},
+    {"request_id": 4, "sender_id": 4, "receiver_id": 5},
+    {"request_id": 5, "sender_id": 5, "receiver_id": 1}
+  ],
+  "messages": [
+    {"message_id": 1, "sender_id": 1, "receiver_id": 2, "content": "Hey Bob, want to watch something tonight?",  "sent_at": "2025-06-01T18:00:00Z"},
+    {"message_id": 2, "sender_id": 2, "receiver_id": 1, "content": "Sure! I've been meaning to finish Breaking Bad.", "sent_at": "2025-06-01T18:05:00Z"},
+    {"message_id": 3, "sender_id": 3, "receiver_id": 4, "content": "Have you played the new Zelda yet?",          "sent_at": "2025-06-02T10:00:00Z"},
+    {"message_id": 4, "sender_id": 4, "receiver_id": 3, "content": "Yeah, 80 hours in and still going!",          "sent_at": "2025-06-02T10:30:00Z"},
+    {"message_id": 5, "sender_id": 1, "receiver_id": 3, "content": "Dune is incredible, you have to read it.",    "sent_at": "2025-06-03T09:00:00Z"}
+  ],
+  "genres": [
+    {"genre_id": 1, "title": "Action"},
+    {"genre_id": 2, "title": "Comedy"},
+    {"genre_id": 3, "title": "Drama"},
+    {"genre_id": 4, "title": "Sci-Fi"},
+    {"genre_id": 5, "title": "Fantasy"}
+  ],
+  "media_items": [
+    {"media_id": 1, "title": "The Dark Knight",                          "media_type": "Movie"},
+    {"media_id": 2, "title": "Breaking Bad",                             "media_type": "Show"},
+    {"media_id": 3, "title": "Fullmetal Alchemist: Brotherhood",         "media_type": "Anime"},
+    {"media_id": 4, "title": "The Legend of Zelda: Breath of the Wild",  "media_type": "Game"},
+    {"media_id": 5, "title": "Dune",                                     "media_type": "Book"}
+  ],
+  "media_item_genres": [
+    {"media_id": 1, "genre_id": 1},
+    {"media_id": 2, "genre_id": 3},
+    {"media_id": 3, "genre_id": 1},
+    {"media_id": 4, "genre_id": 5},
+    {"media_id": 5, "genre_id": 4}
+  ],
+  "consumption_logs": [
+    {"log_id": 1, "user_id": 1, "media_id": 1, "date_consumed": "2025-05-10", "time_consumed": 152},
+    {"log_id": 2, "user_id": 2, "media_id": 2, "date_consumed": "2025-05-12", "time_consumed":  47},
+    {"log_id": 3, "user_id": 3, "media_id": 3, "date_consumed": "2025-05-15", "time_consumed":  24},
+    {"log_id": 4, "user_id": 4, "media_id": 4, "date_consumed": "2025-05-20", "time_consumed": 180},
+    {"log_id": 5, "user_id": 1, "media_id": 5, "date_consumed": "2025-06-01", "time_consumed":  90}
+  ],
+  "goals": [
+    {"goal_id": 1, "user_id": 1, "priority_id": 3, "title": "Watch 5 movies this month",        "due_date": "2026-12-31", "completed": 0},
+    {"goal_id": 2, "user_id": 2, "priority_id": 2, "title": "Finish Breaking Bad",               "due_date": "2026-06-30", "completed": 0},
+    {"goal_id": 3, "user_id": 3, "priority_id": 1, "title": "Read the full Dune series",         "due_date": "2026-09-01", "completed": 0},
+    {"goal_id": 4, "user_id": 4, "priority_id": 3, "title": "100%% Breath of the Wild",          "due_date": "2026-05-01", "completed": 0},
+    {"goal_id": 5, "user_id": 1, "priority_id": 2, "title": "Clear entire anime backlog",        "due_date": "2026-08-15", "completed": 0}
+  ]
+}

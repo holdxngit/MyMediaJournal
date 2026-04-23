@@ -5,7 +5,7 @@ PIP = $(VENV)/bin/pip
 ALEMBIC = $(VENV)/bin/alembic
 FRONTEND_DIR = frontend
 
-.PHONY: help setup up down migrate migration dev-backend dev-frontend install-backend seed seed-py
+.PHONY: help setup up down migrate migration dev-backend dev-frontend install-backend seed seed-py seed-sample
 
 help:
 	@echo "Usage: make <target>"
@@ -20,6 +20,7 @@ help:
 	@echo "  dev-frontend    Run the Next.js dev server"
 	@echo "  seed            Populate the database with sample data (requires Go)"
 	@echo "  seed-py         Populate the database with sample data (Python fallback, no Go needed)"
+	@echo "  seed-sample     Insert 5 demo rows per table for showcase/assignment (NOT for production)"
 
 setup: up install-backend migrate
 
@@ -50,3 +51,6 @@ seed:
 
 seed-py:
 	$(PYTHON) db/seed/seed.py
+
+seed-sample:
+	cd db/seed && go run ./sample
