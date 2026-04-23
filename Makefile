@@ -46,7 +46,7 @@ dev-frontend:
 	cd $(FRONTEND_DIR) && npm run dev
 
 seed:
-	cd scripts/seed && go mod tidy && go run .
+	cd db/seed && go mod tidy && go run .
 
 seed-py:
-	$(PYTHON) scripts/seed/seed.py
+	$(PYTHON) db/seed/seed.py
