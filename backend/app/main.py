@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import Cookie, Depends, FastAPI, File, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import and_, extract, func, or_
+from sqlalchemy import and_, extract, func, or_, text
 from sqlalchemy.orm import Session
 
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads" / "avatars"
@@ -24,13 +24,19 @@ from .auth import (
     verify_password,
 )
 from .db import SessionLocal, ensure_dev_schema, get_db
-from .models import ConsumptionLog, Friendship, FriendRequest, Genre, MediaItem, MediaItemGenre, Message, Role, User
+from .models import ConsumptionLog, Friendship, FriendRequest, Genre, Goal, MediaItem, MediaItemGenre, Message, Priority, Role, User
 from .schemas import (
+    AdminImportResult,
+    AdminMediaItemEntry,
     ConsumptionLogCreate,
     ConsumptionLogResponse,
     ConsumptionLogUpdate,
     FriendRequestResponse,
     FriendResponse,
+    GenreFullResponse,
+    GoalCreate,
+    GoalResponse,
+    GoalUpdate,
     LogStatsResponse,
     LoginRequest,
     MediaItemResponse,
@@ -233,6 +239,26 @@ def _compute_wrapped(target_user_id: int, period: str, db: Session) -> dict:
     }
 
 
+# ── Auth helpers ───────────────────────────────────────────────────────────────
+
+def _require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.role or current_user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return current_user
+
+
+# ── Goal serializer ─────────────────────────────────────────────────────────────
+
+def _serialize_goal(goal: Goal) -> dict:
+    return {
+        "goal_id": goal.goal_id,
+        "title": goal.title,
+        "due_date": goal.due_date,
+        "priority": goal.priority.name if goal.priority else "Medium",
+        "completed": bool(goal.completed),
+    }
+
+
 # ── Root / health ──────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -351,6 +377,12 @@ async def upload_avatar(
 def get_genres(db: Session = Depends(get_db)):
     genres = db.query(Genre).order_by(Genre.title).all()
     return [g.title for g in genres]
+
+
+@app.get("/genres/full", response_model=list[GenreFullResponse])
+def get_genres_full(db: Session = Depends(get_db)):
+    genres = db.query(Genre).order_by(Genre.title).all()
+    return [{"genre_id": g.genre_id, "title": g.title} for g in genres]
 
 
 @app.get("/media", response_model=list[MediaItemResponse])
@@ -705,3 +737,129 @@ async def websocket_endpoint(ws: WebSocket, token: str):
         manager.disconnect(user_id)
     finally:
         db.close()
+
+
+# ── Goals ──────────────────────────────────────────────────────────────────────
+
+VALID_PRIORITIES = {"Low", "Medium", "High"}
+
+
+@app.get("/goals", response_model=list[GoalResponse])
+def get_goals(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    goals = (
+        db.query(Goal)
+        .filter(Goal.user_id == current_user.user_id)
+        .order_by(Goal.completed.asc(), Goal.due_date.asc())
+        .all()
+    )
+    return [_serialize_goal(g) for g in goals]
+
+
+@app.post("/goals", response_model=GoalResponse, status_code=201)
+def create_goal(
+    payload: GoalCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.priority not in VALID_PRIORITIES:
+        raise HTTPException(status_code=400, detail="priority must be Low, Medium, or High.")
+
+    priority = db.query(Priority).filter(Priority.name == payload.priority).first()
+    goal = Goal(
+        user_id=current_user.user_id,
+        title=payload.title,
+        due_date=payload.due_date,
+        priority_id=priority.priority_id if priority else None,
+        completed=0,
+    )
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    return _serialize_goal(goal)
+
+
+@app.patch("/goals/{goal_id}", response_model=GoalResponse)
+def update_goal(
+    goal_id: int,
+    payload: GoalUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    goal = (
+        db.query(Goal)
+        .filter(Goal.goal_id == goal_id, Goal.user_id == current_user.user_id)
+        .first()
+    )
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    goal.completed = 1 if payload.completed else 0
+    db.commit()
+    db.refresh(goal)
+    return _serialize_goal(goal)
+
+
+@app.delete("/goals/{goal_id}", status_code=204)
+def delete_goal(
+    goal_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    goal = (
+        db.query(Goal)
+        .filter(Goal.goal_id == goal_id, Goal.user_id == current_user.user_id)
+        .first()
+    )
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    db.delete(goal)
+    db.commit()
+
+
+# ── Admin ──────────────────────────────────────────────────────────────────────
+
+@app.post("/admin/media-items", response_model=AdminImportResult)
+def admin_import_media(
+    payload: list[AdminMediaItemEntry],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_admin),
+):
+    if not payload:
+        raise HTTPException(status_code=400, detail="No items provided.")
+
+    valid_types = {"Movie", "Show", "Anime", "Game", "Book", "Manga"}
+    imported = 0
+    skipped = 0
+
+    for entry in payload:
+        if entry.media_type not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid media_type '{entry.media_type}'. Must be one of: {', '.join(sorted(valid_types))}.",
+            )
+        existing = (
+            db.query(MediaItem)
+            .filter(MediaItem.title == entry.title, MediaItem.media_type == entry.media_type)
+            .first()
+        )
+        if existing:
+            skipped += 1
+            continue
+        item = MediaItem(title=entry.title, media_type=entry.media_type)
+        db.add(item)
+        db.flush()
+        for genre_id in entry.genres:
+            if db.query(Genre).filter(Genre.genre_id == genre_id).first():
+                db.add(MediaItemGenre(media_id=item.media_id, genre_id=genre_id))
+        imported += 1
+
+    db.commit()
+    if imported:
+        db.execute(
+            text(
+                "SELECT setval(pg_get_serial_sequence('media_item', 'media_id'), "
+                "COALESCE(MAX(media_id), 1)) FROM media_item"
+            )
+        )
+        db.commit()
+
+    return {"imported": imported, "skipped": skipped}

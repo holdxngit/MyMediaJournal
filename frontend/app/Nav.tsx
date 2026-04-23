@@ -51,6 +51,24 @@ function FriendsIcon() {
   );
 }
 
+function GoalsIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -293,9 +311,13 @@ export function Nav({ user, onLogout, onUserUpdate }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const navItems = [
-    { href: "/", label: "Journal", icon: <BookIcon />, active: pathname === "/", soon: false },
-    { href: "/reports", label: "Reports", icon: <BarChartIcon />, active: pathname === "/reports", soon: false },
-    { href: "/friends", label: "Friends", icon: <FriendsIcon />, active: pathname === "/friends", soon: false },
+    { href: "/", label: "Journal", icon: <BookIcon />, active: pathname === "/" },
+    { href: "/reports", label: "Reports", icon: <BarChartIcon />, active: pathname === "/reports" },
+    { href: "/friends", label: "Friends", icon: <FriendsIcon />, active: pathname === "/friends" },
+    { href: "/goals", label: "Goals", icon: <GoalsIcon />, active: pathname === "/goals" },
+    ...(user?.role === "admin"
+      ? [{ href: "/admin", label: "Admin", icon: <AdminIcon />, active: pathname === "/admin" }]
+      : []),
   ];
 
   return (
@@ -303,7 +325,7 @@ export function Nav({ user, onLogout, onUserUpdate }: Props) {
       <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col border-r border-white/[0.06] bg-[#08080f]">
         {/* Brand */}
         <div className="px-5 py-6">
-          <div className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5 transition hover:opacity-80">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -313,7 +335,7 @@ export function Nav({ user, onLogout, onUserUpdate }: Props) {
               <p className="text-sm font-semibold tracking-tight text-white">MediaJournal</p>
               <p className="text-[10px] text-gray-500">Personal tracker</p>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Divider */}
@@ -326,38 +348,25 @@ export function Nav({ user, onLogout, onUserUpdate }: Props) {
 
         {/* Nav items */}
         <nav className="flex-1 space-y-0.5 px-3">
-          {navItems.map((item) =>
-            item.soon ? (
-              <div
-                key={item.href}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 cursor-default"
-              >
-                <span className="text-gray-700">{item.icon}</span>
-                {item.label}
-                <span className="ml-auto rounded-md bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-gray-600">
-                  Soon
-                </span>
-              </div>
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
-                  item.active
-                    ? "bg-violet-500/15 text-violet-300 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.2)]"
-                    : "text-gray-400 hover:bg-white/[0.04] hover:text-gray-200"
-                }`}
-              >
-                <span className={item.active ? "text-violet-400" : "text-gray-500 group-hover:text-gray-300"}>
-                  {item.icon}
-                </span>
-                {item.label}
-                {item.active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-400" />
-                )}
-              </Link>
-            )
-          )}
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                item.active
+                  ? "bg-violet-500/15 text-violet-300 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.2)]"
+                  : "text-gray-400 hover:bg-white/[0.04] hover:text-gray-200"
+              }`}
+            >
+              <span className={item.active ? "text-violet-400" : "text-gray-500 group-hover:text-gray-300"}>
+                {item.icon}
+              </span>
+              {item.label}
+              {item.active && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-400" />
+              )}
+            </Link>
+          ))}
         </nav>
 
         {/* Bottom — user + logout */}

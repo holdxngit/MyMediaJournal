@@ -124,3 +124,37 @@ class WrappedResponse(BaseModel):
     longest_session_minutes: int
     type_breakdown: list[TypeBreakdownItem]
     activity_by_day: list[ActivityDay]
+
+
+class GenreFullResponse(BaseModel):
+    genre_id: int
+    title: str
+
+
+class GoalCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    due_date: date
+    priority: str = "Medium"  # Low | Medium | High
+
+
+class GoalUpdate(BaseModel):
+    completed: bool
+
+
+class GoalResponse(BaseModel):
+    goal_id: int
+    title: str
+    due_date: date
+    priority: str
+    completed: bool
+
+
+class AdminMediaItemEntry(BaseModel):
+    title: str = Field(min_length=1)
+    media_type: str
+    genres: list[int] = []
+
+
+class AdminImportResult(BaseModel):
+    imported: int
+    skipped: int

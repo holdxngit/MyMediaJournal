@@ -209,8 +209,82 @@ def ensure_friends_schema():
         )
 
 
+def drop_removed_tables():
+    """Drop tables that have been removed from the schema."""
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS media_item_source CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS genre_similarity CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS source CASCADE"))
+
+
+def ensure_goals_schema():
+    with engine.begin() as conn:
+        # Priority lookup table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS priority (
+                priority_id SERIAL PRIMARY KEY,
+                name VARCHAR(20) NOT NULL UNIQUE
+            )
+        """))
+        for p in ("Low", "Medium", "High"):
+            conn.execute(text(f"INSERT INTO priority (name) VALUES ('{p}') ON CONFLICT DO NOTHING"))
+
+        # Simplified goal columns
+        conn.execute(text("ALTER TABLE goal ADD COLUMN IF NOT EXISTS due_date DATE"))
+        conn.execute(text(
+            "ALTER TABLE goal ADD COLUMN IF NOT EXISTS completed INTEGER NOT NULL DEFAULT 0"
+        ))
+        conn.execute(text(
+            "ALTER TABLE goal ADD COLUMN IF NOT EXISTS priority_id INTEGER "
+            "REFERENCES priority(priority_id)"
+        ))
+
+        # Backfill any existing rows
+        conn.execute(text(
+            "UPDATE goal SET due_date = CURRENT_DATE + INTERVAL '7 days' WHERE due_date IS NULL"
+        ))
+        conn.execute(text(
+            "UPDATE goal SET priority_id = (SELECT priority_id FROM priority WHERE name = 'Medium') "
+            "WHERE priority_id IS NULL"
+        ))
+
+        # Legacy NOT NULL columns from original schema have no default, which causes INSERTs to fail
+        # because the new model doesn't set them. Add safe defaults so they are silently satisfied.
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'goal' AND column_name = 'start_date' AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE goal ALTER COLUMN start_date SET DEFAULT CURRENT_DATE;
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'goal' AND column_name = 'target_count' AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE goal ALTER COLUMN target_count SET DEFAULT 1;
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'goal' AND column_name = 'quantity' AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE goal ALTER COLUMN quantity SET DEFAULT 1;
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'goal' AND column_name = 'goal_type' AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE goal ALTER COLUMN goal_type SET DEFAULT 'count';
+                END IF;
+            END $$;
+        """))
+
+
 def ensure_dev_schema():
+    drop_removed_tables()
     ensure_roles_schema()
     ensure_auth_schema()
     ensure_journal_schema()
     ensure_friends_schema()
+    ensure_goals_schema()

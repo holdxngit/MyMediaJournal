@@ -89,16 +89,6 @@ class Genre(Base):
     title = Column(String, nullable=False)
 
     media_items = relationship("MediaItemGenre", back_populates="genre")
-    goals = relationship("Goal", back_populates="genre")
-
-
-class Source(Base):
-    __tablename__ = "source"
-
-    source_id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(String, nullable=False)
-
-    media_items = relationship("MediaItemSource", back_populates="source")
 
 
 class MediaItem(Base):
@@ -109,7 +99,6 @@ class MediaItem(Base):
     media_type = Column(String, nullable=False)
 
     genres = relationship("MediaItemGenre", back_populates="media_item")
-    sources = relationship("MediaItemSource", back_populates="media_item")
     logs = relationship("ConsumptionLog", back_populates="media_item")
 
 
@@ -122,25 +111,6 @@ class MediaItemGenre(Base):
 
     media_item = relationship("MediaItem", back_populates="genres")
     genre = relationship("Genre", back_populates="media_items")
-
-
-class MediaItemSource(Base):
-    __tablename__ = "media_item_source"
-    __table_args__ = (PrimaryKeyConstraint("media_id", "source_id"),)
-
-    media_id = Column(Integer, ForeignKey("media_item.media_id"), nullable=False)
-    source_id = Column(Integer, ForeignKey("source.source_id"), nullable=False)
-
-    media_item = relationship("MediaItem", back_populates="sources")
-    source = relationship("Source", back_populates="media_items")
-
-
-class GenreSimilarity(Base):
-    __tablename__ = "genre_similarity"
-    __table_args__ = (PrimaryKeyConstraint("genre_id_1", "genre_id_2"),)
-
-    genre_id_1 = Column(Integer, ForeignKey("genre.genre_id"), nullable=False)
-    genre_id_2 = Column(Integer, ForeignKey("genre.genre_id"), nullable=False)
 
 
 class ConsumptionLog(Base):
@@ -156,19 +126,27 @@ class ConsumptionLog(Base):
     media_item = relationship("MediaItem", back_populates="logs")
 
 
+class Priority(Base):
+    __tablename__ = "priority"
+
+    priority_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(20), nullable=False, unique=True)
+
+    goals = relationship("Goal", back_populates="priority")
+
+
 class Goal(Base):
     __tablename__ = "goal"
 
     goal_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
-    genre_id = Column(Integer, ForeignKey("genre.genre_id"), nullable=True)
+    priority_id = Column(Integer, ForeignKey("priority.priority_id"), nullable=True)
     title = Column(String, nullable=False)
-    media_type = Column(String, nullable=True)
-    quantity = Column(Integer, nullable=False)
-    start_date = Column(Date, nullable=False)
+    due_date = Column(Date, nullable=False)
+    completed = Column(Integer, nullable=False, default=0)  # 0/1, avoids bool dialect issues
 
     user = relationship("User", back_populates="goals")
-    genre = relationship("Genre", back_populates="goals")
+    priority = relationship("Priority", back_populates="goals")
 
 
 class WrappedReport(Base):
