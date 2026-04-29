@@ -480,7 +480,7 @@ export default function Home() {
                         const m = editLog.timeConsumed % 60;
                         setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
                       }}
-                      className={`flex-1 ${inputClass}`}
+                      className={`flex-1 min-w-0 ${inputClass}`}
                     />
                     <input
                       type="number"
@@ -492,7 +492,7 @@ export default function Home() {
                         const h = Math.floor(editLog.timeConsumed / 60);
                         setEditLog((p) => ({ ...p, timeConsumed: h * 60 + m }));
                       }}
-                      className={`flex-1 ${inputClass}`}
+                      className={`flex-1 min-w-0 ${inputClass}`}
                     />
                   </div>
                 </div>
